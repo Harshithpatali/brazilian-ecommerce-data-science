@@ -1,5 +1,18 @@
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+# When Streamlit Cloud (or `streamlit run app/streamlit_app.py`) launches
+# this file directly, it adds this file's own directory ("app/") to
+# sys.path, not the repo root. That breaks "from app.components... import"
+# because Python looks for a package named "app" inside app/ itself.
+# Adding the repo root here makes the "app.*" imports work regardless of
+# how the script is invoked.
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 import streamlit as st
 
 from app.components.theme import inject_theme
