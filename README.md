@@ -1,14 +1,92 @@
+<div align="center">
+
 # 🇧🇷 Brazilian E-Commerce Intelligence Platform
 
-**An end-to-end, SQL-first data science platform** built on the [Olist Brazilian E-Commerce dataset](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce), covering data modeling, business analytics, statistical analysis, machine learning (customer churn), and a live interactive dashboard.
+**An end-to-end, SQL-first data science platform** built on the [Olist Brazilian E-Commerce dataset](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce) — data modeling, business analytics, statistical analysis, machine learning (customer churn), and a live interactive dashboard.
 
-[![Live Demo](https://img.shields.io/badge/Live%20Demo-Streamlit-FF4B4B?logo=streamlit&logoColor=white)](https://olist-ecommerce-ds.streamlit.app/)
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-Streamlit-FF4B4B?logo=streamlit&logoColor=white&style=for-the-badge)](https://olist-ecommerce-ds.streamlit.app/)
+
 [![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Supabase-336791?logo=postgresql&logoColor=white)](https://supabase.com/)
+[![scikit--learn](https://img.shields.io/badge/ML-scikit--learn-F7931E?logo=scikitlearn&logoColor=white)](https://scikit-learn.org/)
 [![MLflow](https://img.shields.io/badge/Tracking-MLflow-0194E2?logo=mlflow&logoColor=white)](https://mlflow.org/)
-[![License](https://img.shields.io/badge/License-MIT-green.svg)](#license)
+[![Streamlit](https://img.shields.io/badge/App-Streamlit-FF4B4B?logo=streamlit&logoColor=white)](https://streamlit.io/)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](#-license)
 
-**🔗 Live app:** **https://olist-ecommerce-ds.streamlit.app/**
+[![Last Commit](https://img.shields.io/github/last-commit/Harshithpatali/brazilian-ecommerce-data-science?color=blue)](https://github.com/Harshithpatali/brazilian-ecommerce-data-science/commits)
+[![Repo Size](https://img.shields.io/github/repo-size/Harshithpatali/brazilian-ecommerce-data-science?color=informational)](https://github.com/Harshithpatali/brazilian-ecommerce-data-science)
+[![Stars](https://img.shields.io/github/stars/Harshithpatali/brazilian-ecommerce-data-science?style=social)](https://github.com/Harshithpatali/brazilian-ecommerce-data-science/stargazers)
+
+</div>
+
+---
+
+## 📑 Table of Contents
+
+- [Dashboard Preview](#-dashboard-preview)
+- [Overview](#-overview)
+- [Key Highlights](#-key-highlights)
+- [Architecture](#️-architecture)
+- [Live Dashboard](#️-live-dashboard)
+- [Source Data](#️-source-data)
+- [Data Model](#-data-model)
+- [SQL Layer](#-sql-layer)
+- [Machine Learning — Customer Churn](#-machine-learning--customer-churn)
+- [Statistical Analysis](#-statistical-analysis)
+- [Tech Stack](#-tech-stack)
+- [Project Structure](#-project-structure)
+- [Getting Started](#-getting-started)
+- [Testing](#-testing)
+- [Security](#-security)
+- [What This Project Demonstrates](#-what-this-project-demonstrates)
+- [Documentation](#-documentation)
+- [License](#-license)
+- [Author](#-author)
+
+---
+
+## 🖼 Dashboard Preview
+
+<table>
+<tr>
+<td width="50%">
+
+**Executive Overview**
+![Executive Overview](screenshots/UI.jpeg)
+Top-line revenue, order volume, AOV, and marketplace KPIs at a glance.
+
+</td>
+<td width="50%">
+
+**Customer Intelligence**
+![Customer Intelligence](screenshots/UI1.jpeg)
+RFM segmentation and customer value distribution.
+
+</td>
+</tr>
+<tr>
+<td width="50%">
+
+**Retention & Cohorts**
+![Retention](screenshots/UI2.jpeg)
+Monthly cohort retention curves and behavior over time.
+
+</td>
+<td width="50%">
+
+**Product Analytics**
+![Products](screenshots/UI3.jpeg)
+Category-level revenue, volume, and review quality.
+
+</td>
+</tr>
+</table>
+
+<div align="center">
+
+**👉 Explore it yourself: [olist-ecommerce-ds.streamlit.app](https://olist-ecommerce-ds.streamlit.app/)**
+
+</div>
 
 ---
 
@@ -18,26 +96,40 @@ This project simulates the work of a senior data scientist embedded in an e-comm
 
 The guiding principle throughout the project is **SQL does the heavy lifting, Python does the modeling and presentation** — raw source tables are never mutated, every derived table respects the correct grain (order-level vs. item-level vs. payment-level), and the churn label is built with strict temporal leakage control.
 
+## ✨ Key Highlights
+
+<div align="center">
+
+| 🗄️ 16 | 🧮 20+ | 🤖 3 | 📊 7 | 📈 90-day |
+|:---:|:---:|:---:|:---:|:---:|
+| SQL build stages | analytical tables/views | ML model families compared | live dashboard pages | churn prediction horizon |
+
+</div>
+
+- ✅ **Zero raw-table mutation** — every transformation lives in `staging` → `analytics` → `ml` schemas
+- ✅ **Leakage-safe ML** — point-in-time features + chronological holdout, not random train/test splits
+- ✅ **Experiment-tracked** — every model run logged and comparable in MLflow
+- ✅ **Reproducible from scratch** — one command (`python -m scripts.build_all`) rebuilds the entire analytical layer
+- ✅ **Shipped, not just notebooked** — deployed as a live, public Streamlit application
+
 ## 🏗️ Architecture
 
-```text
-                     Supabase PostgreSQL (raw olist_* tables)
-                                    |
-                                    v
-                      SQL analytical layer (staging → analytics → ml)
-                                    |
-                    +---------------------------------+
-                    |                                 |
-                    v                                 v
-          Dashboard-ready datasets           Point-in-time ML feature dataset
-                    |                                 |
-                    v                                 v
-             Streamlit dashboard          scikit-learn models + MLflow tracking
-                    \                                 /
-                     \                               /
-                      +----------- GitHub -----------+
-                        (version-controlled SQL,
-                         Python, docs, CI-friendly)
+```mermaid
+flowchart TD
+    A[("🗄️ Supabase PostgreSQL<br/>raw olist_* tables")] --> B["🧱 SQL Analytical Layer<br/>staging → analytics → ml"]
+    B --> C["📊 Dashboard-ready datasets"]
+    B --> D["🎯 Point-in-time ML feature dataset"]
+    C --> E["🖥️ Streamlit Dashboard"]
+    D --> F["🤖 scikit-learn models<br/>+ MLflow tracking"]
+    F --> G["💾 best_churn_model.joblib"]
+    G --> E
+    E --> H(("🌐 Live App<br/>olist-ecommerce-ds.streamlit.app"))
+
+    style A fill:#336791,color:#fff
+    style B fill:#4c72b0,color:#fff
+    style E fill:#FF4B4B,color:#fff
+    style F fill:#0194E2,color:#fff
+    style H fill:#2ea44f,color:#fff
 ```
 
 **Design goals:**
@@ -97,24 +189,27 @@ This project explicitly respects table **grain**:
 
 ## 🧱 Data Model
 
-```text
-public raw tables (untouched)
-       |
-       v
-analytics.order_level   ← the central order-grain fact table
-       |
-       +--> analytics.monthly_revenue
-       +--> analytics.customer_metrics
-       +--> analytics.customer_rfm
-       +--> analytics.cohort_retention
-       +--> analytics.category_performance
-       +--> analytics.seller_performance
-       +--> analytics.delivery_performance
-       +--> analytics.delivery_vs_review
-       +--> analytics.geographic_performance
-       |
-       v
-ml.delivered_orders → ml.customer_monthly_activity → ml.customer_churn_dataset
+```mermaid
+flowchart LR
+    RAW[("public raw tables<br/>(untouched)")] --> OL["analytics.order_level<br/><i>central order-grain fact table</i>"]
+
+    OL --> MR[monthly_revenue]
+    OL --> CM[customer_metrics]
+    OL --> RFM[customer_rfm]
+    OL --> COH[cohort_retention]
+    OL --> CAT[category_performance]
+    OL --> SEL[seller_performance]
+    OL --> DEL[delivery_performance]
+    OL --> DVR[delivery_vs_review]
+    OL --> GEO[geographic_performance]
+
+    OL --> DO[ml.delivered_orders]
+    DO --> CMA[ml.customer_monthly_activity]
+    CMA --> CCD[("ml.customer_churn_dataset")]
+
+    style RAW fill:#336791,color:#fff
+    style OL fill:#4c72b0,color:#fff
+    style CCD fill:#0194E2,color:#fff
 ```
 
 See [`docs/data_model.md`](docs/data_model.md) for the full breakdown.
@@ -162,9 +257,30 @@ Every script is designed to be **rerunnable against a live database** without ma
 
 Three model families are trained and compared with **expanding-window temporal cross-validation** and randomized hyperparameter search, optimizing primarily for **PR-AUC** (with ROC-AUC and F1 as secondary metrics):
 
-1. **Logistic Regression** — interpretable linear baseline
-2. **Random Forest** — nonlinear bagged tree ensemble
-3. **HistGradientBoosting** — boosted tree model suited to tabular data
+| # | Model | Type | Why it's included |
+|---|---|---|---|
+| 1 | **Logistic Regression** | Linear baseline | Interpretable coefficients, fast, strong sanity-check baseline |
+| 2 | **Random Forest** | Bagged tree ensemble | Captures nonlinearity and interactions with low tuning effort |
+| 3 | **HistGradientBoosting** | Boosted trees | Typically strongest performer on tabular, mixed-scale numeric data |
+
+```mermaid
+flowchart LR
+    A["Point-in-time<br/>churn dataset"] --> B["Chronological split<br/>train / validation / test"]
+    B --> C["Randomized hyperparameter search<br/>+ expanding-window CV"]
+    C --> D1[Logistic Regression]
+    C --> D2[Random Forest]
+    C --> D3[HistGradientBoosting]
+    D1 --> E["Compare on PR-AUC<br/>(+ ROC-AUC, F1)"]
+    D2 --> E
+    D3 --> E
+    E --> F["Select best pipeline"]
+    F --> G[("models/best_churn_model.joblib")]
+    C -.logged to.-> M[("MLflow<br/>Tracking Server")]
+
+    style A fill:#4c72b0,color:#fff
+    style G fill:#2ea44f,color:#fff
+    style M fill:#0194E2,color:#fff
+```
 
 The performance-optimized build first materializes delivered orders into a compact `ml.delivered_orders` table, aggregates to `ml.customer_monthly_activity`, and only then constructs the point-in-time dataset — avoiding an expensive snapshot × full-order-history join and reducing the risk of Supabase statement timeouts on large SQL builds.
 
