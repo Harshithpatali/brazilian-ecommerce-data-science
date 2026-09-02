@@ -1,0 +1,42 @@
+{
+  "experiment_name": "brazilian-ecommerce-churn",
+  "tracking_uri": "file:///D:/brazilian-ecommerce-data-science/mlruns",
+  "selected_model": "logistic_regression",
+  "selection_metric": "pr_auc",
+  "best_params": {
+    "model__C": 0.05,
+    "model__solver": "liblinear"
+  },
+  "holdout_cutoff": "2018-01-01",
+  "holdout_metrics": {
+    "model": "logistic_regression",
+    "roc_auc": 0.7214643504209742,
+    "pr_auc": 0.9729333524679001,
+    "precision": 0.9689737470167065,
+    "recall": 0.9519343493552169,
+    "f1": 0.9603784742755765,
+    "cv_pr_auc": 0.9256892169196094,
+    "best_params": "{\"model__C\": 0.05, \"model__solver\": \"liblinear\"}"
+  },
+  "feature_columns": [
+    "orders_180d",
+    "orders_90d",
+    "orders_30d",
+    "revenue_180d",
+    "revenue_90d",
+    "revenue_30d",
+    "avg_order_value_180d",
+    "avg_review_score_180d",
+    "avg_delivery_delay_180d",
+    "active_months_180d",
+    "recency_days",
+    "recent_order_share",
+    "recent_revenue_share",
+    "orders_per_active_month",
+    "revenue_per_order",
+    "recent_vs_older_order_ratio"
+  ],
+  "eligible_population": "customers_with_at_least_2_prior_delivered_orders_and_recent_180d_activity",
+  "feature_window_days": 180,
+  "prediction_window_days": 90
+}

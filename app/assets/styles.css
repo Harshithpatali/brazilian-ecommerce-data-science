@@ -1,0 +1,173 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
+
+:root {
+    --bg: #0b1220;
+    --surface: #111c30;
+    --surface-hover: #16233b;
+    --border: rgba(148, 163, 184, 0.14);
+    --border-strong: rgba(148, 163, 184, 0.28);
+    --text: #e8eef8;
+    --text-muted: #8fa0bd;
+    --text-faint: #5b6b85;
+    --blue: #38bdf8;
+    --violet: #a78bfa;
+    --teal: #2dd4bf;
+    --amber: #fbbf24;
+    --rose: #fb7185;
+    --radius: 10px;
+}
+
+/* ---------- base type ---------- */
+html, body, [class*="css"] {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.stApp {
+    background:
+        radial-gradient(1100px 480px at 12% -8%, rgba(56, 189, 248, 0.07), transparent 60%),
+        radial-gradient(900px 420px at 92% 0%, rgba(167, 139, 250, 0.06), transparent 55%),
+        var(--bg);
+}
+
+.block-container { padding-top: 1.4rem; padding-bottom: 3rem; max-width: 1200px; }
+
+h1, h2, h3 { font-family: 'Space Grotesk', 'Inter', sans-serif; color: var(--text); }
+
+/* ---------- sidebar ---------- */
+section[data-testid="stSidebar"] {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+}
+section[data-testid="stSidebar"] * { color: var(--text) !important; }
+section[data-testid="stSidebar"] [data-testid="stSidebarNav"] a {
+    border-radius: 8px;
+    transition: background-color 120ms ease;
+}
+section[data-testid="stSidebar"] [data-testid="stSidebarNav"] a:hover {
+    background: var(--surface-hover);
+}
+
+/* ---------- hero ---------- */
+.hero {
+    position: relative;
+    padding: 4px 0 20px 0;
+    margin-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+}
+.hero::after {
+    content: "";
+    position: absolute;
+    left: 0; bottom: -1px;
+    width: 64px; height: 2px;
+    background: linear-gradient(90deg, var(--blue), var(--violet));
+}
+.hero h1 {
+    font-weight: 600;
+    font-size: 1.85rem;
+    letter-spacing: -0.01em;
+    margin: 0 0 6px 0;
+}
+.hero p {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.95rem;
+    max-width: 640px;
+    line-height: 1.5;
+}
+
+/* ---------- metric cards ---------- */
+.metric-card {
+    position: relative;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 18px 14px 20px;
+    overflow: hidden;
+    height: 100%;
+}
+.metric-card::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    background: var(--accent-bar, var(--blue));
+}
+.metric-label {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    font-weight: 500;
+    margin-bottom: 6px;
+}
+.metric-value {
+    font-family: 'Space Grotesk', 'Inter', sans-serif;
+    font-size: 1.6rem;
+    font-weight: 600;
+    color: var(--text);
+    line-height: 1.15;
+    word-break: break-word;
+}
+.metric-delta {
+    display: inline-block;
+    font-size: 0.78rem;
+    color: var(--teal);
+    margin-top: 6px;
+    font-weight: 500;
+}
+.metric-help {
+    font-size: 0.74rem;
+    color: var(--text-faint);
+    margin-top: 6px;
+}
+
+/* ---------- section titles ---------- */
+.section-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 1.04rem;
+    font-weight: 600;
+    color: var(--text);
+    margin: 30px 0 2px 0;
+}
+.section-title::before {
+    content: "";
+    width: 8px; height: 8px;
+    border-radius: 2px;
+    background: var(--blue);
+    flex-shrink: 0;
+}
+.section-subtitle {
+    font-size: 0.84rem;
+    color: var(--text-muted);
+    margin: 2px 0 14px 16px;
+}
+
+/* ---------- panels ---------- */
+.panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+}
+
+/* ---------- native widgets ---------- */
+[data-testid="stDataFrame"] {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+}
+[data-testid="stMetricValue"] { font-family: 'Space Grotesk', 'Inter', sans-serif; }
+
+div[data-baseweb="slider"] { padding-top: 4px; }
+
+hr { border-color: var(--border) !important; }
+
+[data-testid="stAlert"] {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 6px; }

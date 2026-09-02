@@ -1,0 +1,16 @@
+.env
+.env.*
+!.env.example
+
+__pycache__/
+*.pyc
+
+.venv/
+venv/
+
+mlruns/
+*.log
+
+.DS_Store
+
+.streamlit/secrets.toml

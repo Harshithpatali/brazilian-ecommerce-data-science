@@ -1,0 +1,3 @@
+model,roc_auc,pr_auc,precision,recall,f1,cv_pr_auc,best_params
+logistic_regression,0.7214643504209742,0.9729333524679001,0.9689737470167065,0.9519343493552169,0.9603784742755765,0.9256892169196094,"{""model__C"": 0.05, ""model__solver"": ""liblinear""}"
+hist_gradient_boosting,0.6708408824469786,0.9664068390045113,0.969732246798603,0.9765533411488863,0.9731308411214953,0.9601084455429288,"{""model__l2_regularization"": 0.0, ""model__learning_rate"": 0.08, ""model__max_iter"": 300, ""model__max_leaf_nodes"": 15, ""model__min_samples_leaf"": 20}"
