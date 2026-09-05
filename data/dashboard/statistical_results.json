@@ -1,0 +1,215 @@
+{
+  "alpha": 0.05,
+  "random_seed": 42,
+  "one_way_anova": {
+    "f_statistic": 21539.316349274766,
+    "p_value": 0.0,
+    "eta_squared": 0.5373073293343216,
+    "levene_statistic": 1509.2033746299785,
+    "levene_p_value": 0.0,
+    "null_conclusion": "Reject H0",
+    "variance_heterogeneity": true,
+    "tukey": [
+      {
+        "group1": "At Risk",
+        "group2": "Champions",
+        "meandiff": 0.6214,
+        "p-adj": 0.0,
+        "lower": 0.5973,
+        "upper": 0.6455,
+        "reject": true
+      },
+      {
+        "group1": "At Risk",
+        "group2": "Lost",
+        "meandiff": -1.0967,
+        "p-adj": 0.0,
+        "lower": -1.1188,
+        "upper": -1.0747,
+        "reject": true
+      },
+      {
+        "group1": "At Risk",
+        "group2": "Loyal Customers",
+        "meandiff": 0.1458,
+        "p-adj": 0.0,
+        "lower": 0.1258,
+        "upper": 0.1658,
+        "reject": true
+      },
+      {
+        "group1": "At Risk",
+        "group2": "Needs Attention",
+        "meandiff": -0.4426,
+        "p-adj": 0.0,
+        "lower": -0.4637,
+        "upper": -0.4215,
+        "reject": true
+      },
+      {
+        "group1": "At Risk",
+        "group2": "New / Potential",
+        "meandiff": -1.0739,
+        "p-adj": 0.0,
+        "lower": -1.0956,
+        "upper": -1.0521,
+        "reject": true
+      },
+      {
+        "group1": "Champions",
+        "group2": "Lost",
+        "meandiff": -1.7181,
+        "p-adj": 0.0,
+        "lower": -1.7391,
+        "upper": -1.6972,
+        "reject": true
+      },
+      {
+        "group1": "Champions",
+        "group2": "Loyal Customers",
+        "meandiff": -0.4756,
+        "p-adj": 0.0,
+        "lower": -0.4945,
+        "upper": -0.4567,
+        "reject": true
+      },
+      {
+        "group1": "Champions",
+        "group2": "Needs Attention",
+        "meandiff": -1.064,
+        "p-adj": 0.0,
+        "lower": -1.084,
+        "upper": -1.0439,
+        "reject": true
+      },
+      {
+        "group1": "Champions",
+        "group2": "New / Potential",
+        "meandiff": -1.6953,
+        "p-adj": 0.0,
+        "lower": -1.716,
+        "upper": -1.6746,
+        "reject": true
+      },
+      {
+        "group1": "Lost",
+        "group2": "Loyal Customers",
+        "meandiff": 1.2425,
+        "p-adj": 0.0,
+        "lower": 1.2264,
+        "upper": 1.2587,
+        "reject": true
+      },
+      {
+        "group1": "Lost",
+        "group2": "Needs Attention",
+        "meandiff": 0.6542,
+        "p-adj": 0.0,
+        "lower": 0.6367,
+        "upper": 0.6716,
+        "reject": true
+      },
+      {
+        "group1": "Lost",
+        "group2": "New / Potential",
+        "meandiff": 0.0229,
+        "p-adj": 0.0046,
+        "lower": 0.0047,
+        "upper": 0.0411,
+        "reject": true
+      },
+      {
+        "group1": "Loyal Customers",
+        "group2": "Needs Attention",
+        "meandiff": -0.5884,
+        "p-adj": 0.0,
+        "lower": -0.6033,
+        "upper": -0.5735,
+        "reject": true
+      },
+      {
+        "group1": "Loyal Customers",
+        "group2": "New / Potential",
+        "meandiff": -1.2197,
+        "p-adj": 0.0,
+        "lower": -1.2354,
+        "upper": -1.2039,
+        "reject": true
+      },
+      {
+        "group1": "Needs Attention",
+        "group2": "New / Potential",
+        "meandiff": -0.6313,
+        "p-adj": 0.0,
+        "lower": -0.6484,
+        "upper": -0.6142,
+        "reject": true
+      }
+    ],
+    "kruskal_wallis": {
+      "h_statistic": 56518.290620512875,
+      "p_value": 0.0
+    }
+  },
+  "two_factor_anova": {
+    "anova_table": [
+      {
+        "term": "C(segment)",
+        "sum_sq": 219.76041790370334,
+        "df": 5.0,
+        "F": 32.510454161819794,
+        "PR(>F)": 3.0290182987556014e-33
+      },
+      {
+        "term": "C(delivery_performance_group)",
+        "sum_sq": 26182.02379545899,
+        "df": 3.0,
+        "F": 6455.435215809478,
+        "PR(>F)": 0.0
+      },
+      {
+        "term": "C(segment):C(delivery_performance_group)",
+        "sum_sq": 57.6476225836536,
+        "df": 15.0,
+        "F": 2.842717551870496,
+        "PR(>F)": 0.00017942400740486494
+      },
+      {
+        "term": "Residual",
+        "sum_sq": 125355.6479270327,
+        "df": 92723.0,
+        "F": null,
+        "PR(>F)": null
+      }
+    ],
+    "interaction_p_value": 0.00017942400740486494,
+    "interaction_significant": true,
+    "interaction_interpretation": "Evidence of an interaction effect at alpha=0.05."
+  },
+  "sampling": {
+    "population_size": 93358,
+    "sample_size": 1000,
+    "population_mean": 165.16821000878338,
+    "simple_random_sample": {
+      "sample_mean": 157.46884999999997,
+      "ci_lower": 145.1777174564247,
+      "ci_upper": 169.75998254357526,
+      "absolute_error": 7.699360008783401,
+      "relative_error": 0.046615265784947124
+    },
+    "stratified_sample": {
+      "sample_size": 1000,
+      "sample_mean": 169.21922999999998,
+      "weighted_mean": 169.08262315167363,
+      "weighted_absolute_error": 3.914413142890254,
+      "allocation": {
+        "At Risk": 84,
+        "Champions": 99,
+        "Lost": 154,
+        "Loyal Customers": 300,
+        "Needs Attention": 198,
+        "New / Potential": 165
+      }
+    }
+  }
+}
