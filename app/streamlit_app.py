@@ -16,7 +16,7 @@ if str(ROOT) not in sys.path:
 import streamlit as st
 
 from app.components.theme import inject_theme
-from app.pages import churn, customers, delivery, executive, products, retention, sellers
+from app.pages import churn, customers, delivery, executive, products, retention, sellers, statistics
 
 st.set_page_config(
     page_title="Brazilian E-Commerce Intelligence",
@@ -35,7 +35,7 @@ def home() -> None:
     )
     st.write(
         "Explore marketplace performance, customer behavior, retention, products, "
-        "sellers, delivery experience, and predictive churn risk."
+        "sellers, delivery experience, statistical analysis, and predictive churn risk."
     )
     st.info(
         "The dashboard is downstream of the SQL analytical layer. "
@@ -52,6 +52,7 @@ pages = {
         st.Page(products.render, title="Product Analytics", url_path="products", icon="🛍️"),
         st.Page(sellers.render, title="Seller Analytics", url_path="sellers", icon="🏪"),
         st.Page(delivery.render, title="Delivery & Experience", url_path="delivery", icon="🚚"),
+        st.Page(statistics.render, title="Statistical Analysis", url_path="statistics", icon="📈"),
         st.Page(churn.render, title="Churn Intelligence", url_path="churn", icon="🎯"),
     ]
 }
