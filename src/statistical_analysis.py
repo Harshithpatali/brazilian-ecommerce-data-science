@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 
 import numpy as np
@@ -230,10 +231,26 @@ def run_analysis() -> dict:
     return results
 
 
+def _json_safe(value):
+    """Convert NumPy/Pandas scalars and non-finite floats to JSON-safe values."""
+    if isinstance(value, dict):
+        return {str(key): _json_safe(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_safe(item) for item in value]
+    if isinstance(value, (np.integer,)):
+        return int(value)
+    if isinstance(value, (np.floating,)):
+        value = float(value)
+    if isinstance(value, float) and not math.isfinite(value):
+        return None
+    return value
+
+
 def save_dashboard_results(results: dict) -> Path:
     DASHBOARD_OUT.parent.mkdir(parents=True, exist_ok=True)
+    safe_results = _json_safe(results)
     with DASHBOARD_OUT.open("w", encoding="utf-8") as handle:
-        json.dump(results, handle, indent=2, allow_nan=False)
+        json.dump(safe_results, handle, indent=2, allow_nan=False)
     print(f"Wrote {DASHBOARD_OUT}")
     return DASHBOARD_OUT
 
