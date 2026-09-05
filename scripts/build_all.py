@@ -39,5 +39,10 @@ subprocess.run(
     check=True,
     cwd=ROOT,
 )
+subprocess.run(
+    [sys.executable, "-m", "src.statistical_analysis"],
+    check=True,
+    cwd=ROOT,
+)
 
 print("Project build completed.")
