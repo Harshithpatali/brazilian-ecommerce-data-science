@@ -5,6 +5,7 @@ psycopg[binary]>=3.2,<4
 python-dotenv>=1.0,<2
 pyarrow>=17,<23
 scipy>=1.13,<2
+statsmodels>=0.14,<1
 scikit-learn>=1.5,<2
 matplotlib>=3.9,<4
 streamlit>=1.40,<2
