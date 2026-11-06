@@ -17,7 +17,8 @@ from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
     average_precision_score, classification_report, confusion_matrix,
-    f1_score, precision_recall_curve, precision_score, recall_score, roc_auc_score,
+    balanced_accuracy_score, f1_score, matthews_corrcoef, precision_recall_curve,
+    precision_score, recall_score, roc_auc_score,
 )
 from sklearn.model_selection import GridSearchCV, TimeSeriesSplit
 from sklearn.pipeline import Pipeline
@@ -348,6 +349,11 @@ def main() -> None:
         "precision": float(precision_score(y_test, test_pred, zero_division=0)),
         "recall": float(recall_score(y_test, test_pred, zero_division=0)),
         "f1": float(f1_score(y_test, test_pred, zero_division=0)),
+        "class_0_precision": float(precision_score(y_test, test_pred, pos_label=0, zero_division=0)),
+        "class_0_recall": float(recall_score(y_test, test_pred, pos_label=0, zero_division=0)),
+        "class_0_f1": float(f1_score(y_test, test_pred, pos_label=0, zero_division=0)),
+        "balanced_accuracy": float(balanced_accuracy_score(y_test, test_pred)),
+        "matthews_corrcoef": float(matthews_corrcoef(y_test, test_pred)),
         "positive_prevalence": float(y_test.mean()),
         "threshold": float(threshold),
     }
