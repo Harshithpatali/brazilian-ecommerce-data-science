@@ -9,7 +9,7 @@ import streamlit as st
 
 from app.components.ui import hero, metric_card, section_title
 from src.features.churn_features import FEATURE_COLS, add_churn_features
-from src.models.train_churn import MODEL_VERSION
+from src.models.model_contract import MODEL_VERSION, validate_model_metadata
 
 ROOT = Path(__file__).resolve().parents[2]
 DATA_PATH = ROOT / "data" / "ml" / "customer_churn_dataset.parquet"
@@ -48,12 +48,15 @@ def render() -> None:
         "Historical point-in-time customer scoring using a 90-day forward inactivity target.",
     )
     metadata = load_metadata()
-    if metadata.get("model_version") != MODEL_VERSION or metadata.get("pipeline_status") != "ready":
+    contract_errors = validate_model_metadata(metadata)
+    if contract_errors:
         st.warning(
-            "The checked-in churn model predates the corrected target and evaluation "
-            "workflow. Rebuild the PostgreSQL churn dataset, run the corrected training "
-            "pipeline, and redeploy the resulting model artifacts before using this page."
+            "The churn model artifacts are missing, stale, or inconsistent. "
+            "Rebuild the PostgreSQL churn dataset, run the corrected training "
+            "pipeline, and redeploy the new model artifacts."
         )
+        for error in contract_errors:
+            st.write(f"- {error}")
         st.code(
             "python -m scripts.build_all\n"
             "python -m scripts.validate_churn_data\n"
@@ -104,7 +107,7 @@ def render() -> None:
         with column:
             metric_card(label, value, help_text=help_text, accent=accent)
 
-    test = metadata.get("test_metrics", {})
+    test_metrics = metadata["test_metrics"]
     baseline = metadata.get("dummy_baseline", {})
     section_title(
         "Final chronological test evaluation",
@@ -112,10 +115,10 @@ def render() -> None:
     )
     metric_columns = st.columns(4)
     values = [
-        ("Test PR-AUC", test.get("pr_auc"), "Average precision"),
+        ("Test PR-AUC", test_metrics.get("pr_auc"), "Average precision"),
         ("Dummy PR-AUC", baseline.get("test_pr_auc"), "Prior-probability baseline"),
-        ("Test ROC-AUC", test.get("roc_auc"), "Threshold independent"),
-        ("Test F1", test.get("f1"), f"Validation threshold {threshold:.3f}"),
+        ("Test ROC-AUC", test_metrics.get("roc_auc"), "Threshold independent"),
+        ("Test F1", test_metrics.get("f1"), f"Validation threshold {threshold:.3f}"),
     ]
     for column, (label, value, help_text) in zip(metric_columns, values):
         with column:
@@ -234,7 +237,7 @@ def render() -> None:
             "threshold": metadata.get("threshold"),
             "periods": metadata.get("periods", {}),
             "class_distribution": metadata.get("class_distribution", {}),
-            "test_metrics": test,
+            "test_metrics": test_metrics,
             "dummy_baseline": baseline,
             "best_params": metadata.get("best_params", {}),
             "features": metadata.get("feature_columns", []),
