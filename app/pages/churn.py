@@ -295,6 +295,41 @@ def render() -> None:
     if not comparison.empty:
         show = [c for c in ["model", "cv_repeat_purchase_pr_auc", "selected", "best_params"] if c in comparison.columns]
         st.dataframe(comparison[show], use_container_width=True, hide_index=True)
+        if "cv_repeat_purchase_pr_auc" in comparison.columns:
+            baseline_rows = comparison[
+                comparison["model"].astype(str).str.startswith("baseline_")
+            ]
+            candidate_rows = comparison[
+                ~comparison["model"].astype(str).str.startswith("baseline_")
+            ]
+            if not baseline_rows.empty and not candidate_rows.empty:
+                best_baseline = float(baseline_rows["cv_repeat_purchase_pr_auc"].max())
+                best_candidate = float(candidate_rows["cv_repeat_purchase_pr_auc"].max())
+                if best_candidate <= best_baseline:
+                    st.warning(
+                        "No trained model beats the strongest RFM baseline on temporal CV. "
+                        "Treat the ranking as experimental; do not deploy it for automated campaigns."
+                    )
+                else:
+                    st.success(
+                        f"Best trained candidate exceeds the strongest temporal-CV baseline "
+                        f"({best_candidate:.4f} vs {best_baseline:.4f} PR-AUC). "
+                        "Confirm the untouched holdout and capacity lift before production use."
+                    )
+
+    importance_path = ROOT / "models" / "feature_importance.csv"
+    if importance_path.exists():
+        importance = pd.read_csv(importance_path)
+        if not importance.empty and {"feature", "importance"}.issubset(importance.columns):
+            section_title(
+                "Model explainability",
+                "Global model importance from the selected estimator. These are predictive associations, not causal effects."
+            )
+            st.bar_chart(
+                importance.head(15).sort_values("importance").set_index("feature"),
+                use_container_width=True,
+            )
+            st.dataframe(importance.head(20), use_container_width=True, hide_index=True)
 
     section_title(
         "Campaign capacity and ranking quality",
