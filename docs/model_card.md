@@ -2,9 +2,11 @@
 
 ## Status
 
-The corrected pipeline version is churn-pit-v4. Existing v3 artifacts are
-superseded by the new point-in-time feature set and recall-oriented threshold
-policy. The v4 model and metadata must be regenerated before deployment.
+The corrected pipeline version is churn-pit-v4. The refreshed dataset,
+model, metadata, candidate comparison, holdout predictions, classification
+report, confusion matrix and precision-recall curve are committed to the
+v4 feature branch. Merge PR #4 before deploying this version to the default
+branch or the Streamlit application.
 
 ## Intended use
 
