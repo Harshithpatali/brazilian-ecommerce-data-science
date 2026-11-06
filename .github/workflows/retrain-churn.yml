@@ -77,7 +77,7 @@ jobs:
       - name: Export dataset, tune models and produce v4 artifacts
         run: python -m scripts.run_ml
 
-      - name: Verify v3 metadata and model fingerprint
+      - name: Verify v4 metadata and model fingerprint
         shell: bash
         run: |
           python - <<'PY'
