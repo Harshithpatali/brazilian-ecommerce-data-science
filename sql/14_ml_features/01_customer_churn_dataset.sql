@@ -62,8 +62,9 @@ CREATE INDEX idx_ml_customer_month
     ON ml.customer_monthly_activity (customer_unique_id, activity_month);
 ANALYZE ml.customer_monthly_activity;
 
-/* Begin after the second delivered order. Only dates with a fully observed
-   90-day future label window are materialized. */
+/* Begin after the first delivered order. This is a second-purchase propensity
+   cohort: a customer becomes eligible after their first order is delivered.
+   Only dates with a fully observed 90-day forward label window are materialized. */
 CREATE TABLE ml.customer_snapshot_calendar AS
 WITH ranked_delivered AS (
     SELECT
@@ -76,12 +77,12 @@ WITH ranked_delivered AS (
         ) AS delivered_order_number
     FROM ml.delivered_orders
 ),
-second_delivered AS (
+first_delivered AS (
     SELECT
         customer_unique_id,
-        order_delivered_customer_date AS second_delivery_timestamp
+        order_delivered_customer_date AS first_delivery_timestamp
     FROM ranked_delivered
-    WHERE delivered_order_number = 2
+    WHERE delivered_order_number = 1
 ),
 observation_end AS (
     SELECT MAX(order_purchase_timestamp) AS max_observed_purchase_timestamp
@@ -91,11 +92,11 @@ observation_end AS (
 SELECT
     s.customer_unique_id,
     generated.snapshot_timestamp::date AS snapshot_date
-FROM second_delivered s
+FROM first_delivered s
 CROSS JOIN observation_end o
 CROSS JOIN LATERAL GENERATE_SERIES(
     (
-        DATE_TRUNC('month', s.second_delivery_timestamp)::date
+        DATE_TRUNC('month', s.first_delivery_timestamp)::date
         + INTERVAL '1 month'
     )::timestamp,
     DATE_TRUNC('month', o.max_observed_purchase_timestamp)::timestamp,
