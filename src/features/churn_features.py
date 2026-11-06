@@ -3,7 +3,7 @@ from __future__ import annotations
 import pandas as pd
 
 
-FEATURE_COLS = [
+NUMERIC_FEATURE_COLS = [
     "orders_180d",
     "orders_90d",
     "orders_30d",
@@ -33,7 +33,23 @@ FEATURE_COLS = [
     "recent_vs_older_order_ratio",
 ]
 
+CATEGORICAL_FEATURE_COLS = [
+    "customer_state",
+    "snapshot_month",
+]
+
+FEATURE_COLS = [*NUMERIC_FEATURE_COLS, *CATEGORICAL_FEATURE_COLS]
+
 
 def add_churn_features(df: pd.DataFrame) -> pd.DataFrame:
-    """Return the SQL-generated, leakage-safe churn feature contract."""
-    return df.copy()
+    """Normalize categorical fields without deriving information from future data."""
+    result = df.copy()
+    if "customer_state" in result.columns:
+        result["customer_state"] = (
+            result["customer_state"].fillna("UNKNOWN").astype(str).str.upper()
+        )
+    if "snapshot_month" in result.columns:
+        result["snapshot_month"] = (
+            result["snapshot_month"].fillna(-1).astype(str)
+        )
+    return result
