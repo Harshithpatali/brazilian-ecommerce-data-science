@@ -17,6 +17,9 @@ _REQUIRED_METRICS = (
     "class_0_precision",
     "class_0_recall",
     "class_0_f1",
+    "class_1_precision",
+    "class_1_recall",
+    "class_1_f1",
     "balanced_accuracy",
     "matthews_corrcoef",
     "positive_prevalence",
@@ -41,6 +44,15 @@ def validate_model_metadata(metadata: dict[str, Any]) -> list[str]:
         )
     if metadata.get("feature_columns") != FEATURE_COLS:
         errors.append("feature_columns do not match the application's feature contract.")
+
+    if metadata.get("evaluation_positive_class") != "purchase_within_90_days (SQL churned=0)":
+        errors.append("evaluation_positive_class must identify repeat purchase (SQL churned=0).")
+
+    repeat_threshold = metadata.get("repeat_purchase_probability_threshold")
+    if not isinstance(repeat_threshold, (int, float)) or not isfinite(float(repeat_threshold)):
+        errors.append("repeat_purchase_probability_threshold must be finite.")
+    elif not 0 <= float(repeat_threshold) <= 1:
+        errors.append("repeat_purchase_probability_threshold must be between 0 and 1.")
 
     availability = metadata.get("feature_availability")
     if not isinstance(availability, dict):
@@ -73,6 +85,7 @@ def validate_model_metadata(metadata: dict[str, Any]) -> list[str]:
         bounded_metrics = (
             "roc_auc", "pr_auc", "precision", "recall", "f1",
             "class_0_precision", "class_0_recall", "class_0_f1",
+            "class_1_precision", "class_1_recall", "class_1_f1",
             "balanced_accuracy", "positive_prevalence", "threshold",
             "dummy_baseline_pr_auc",
         )
