@@ -50,6 +50,9 @@ def add_churn_features(df: pd.DataFrame) -> pd.DataFrame:
         )
     if "snapshot_month" in result.columns:
         result["snapshot_month"] = (
-            result["snapshot_month"].fillna(-1).astype(str)
+            pd.to_numeric(result["snapshot_month"], errors="coerce")
+            .fillna(-1)
+            .astype("int64")
+            .astype(str)
         )
     return result
