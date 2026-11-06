@@ -262,7 +262,7 @@ def main() -> None:
 
     train_dates = df["snapshot_date"].iloc[train_idx].reset_index(drop=True)
     n_dates = int(train_dates.dt.normalize().nunique())
-    folds = make_date_grouped_splits(train_dates, y=y_train, n_splits=min(4, n_dates - 1))
+    folds = make_date_grouped_splits(train_dates, y=y_train, n_splits=min(4, n_dates - 4))
 
     experiment = configure_mlflow()
     searches: dict[str, GridSearchCV] = {}
