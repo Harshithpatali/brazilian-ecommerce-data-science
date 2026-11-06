@@ -1,0 +1,10 @@
+table_name,row_count,distinct_keys,null_keys
+category_translation,71,71,0
+customers,99441,99441,0
+geolocation,1000163,1000163,0
+order_items,112650,112650,0
+orders,99441,99441,0
+payments,103886,103886,0
+products,32951,32951,0
+reviews,99224,98410,0
+sellers,3095,3095,0

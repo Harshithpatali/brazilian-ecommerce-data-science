@@ -1,0 +1,448 @@
+{
+  "profile_scope": "read-only raw Olist source tables",
+  "source_inventory": [
+    {
+      "table_name": "category_translation",
+      "row_count": 71,
+      "distinct_keys": 71,
+      "null_keys": 0
+    },
+    {
+      "table_name": "customers",
+      "row_count": 99441,
+      "distinct_keys": 99441,
+      "null_keys": 0
+    },
+    {
+      "table_name": "geolocation",
+      "row_count": 1000163,
+      "distinct_keys": 1000163,
+      "null_keys": 0
+    },
+    {
+      "table_name": "order_items",
+      "row_count": 112650,
+      "distinct_keys": 112650,
+      "null_keys": 0
+    },
+    {
+      "table_name": "orders",
+      "row_count": 99441,
+      "distinct_keys": 99441,
+      "null_keys": 0
+    },
+    {
+      "table_name": "payments",
+      "row_count": 103886,
+      "distinct_keys": 103886,
+      "null_keys": 0
+    },
+    {
+      "table_name": "products",
+      "row_count": 32951,
+      "distinct_keys": 32951,
+      "null_keys": 0
+    },
+    {
+      "table_name": "reviews",
+      "row_count": 99224,
+      "distinct_keys": 98410,
+      "null_keys": 0
+    },
+    {
+      "table_name": "sellers",
+      "row_count": 3095,
+      "distinct_keys": 3095,
+      "null_keys": 0
+    }
+  ],
+  "order_quality": {
+    "orders": 99441,
+    "distinct_orders": 99441,
+    "order_customer_ids": 99441,
+    "delivered_orders": 96478,
+    "non_delivered_orders": 2963,
+    "missing_purchase_time": 0,
+    "missing_delivery_time": 2965,
+    "delivered_without_delivery_time": 8,
+    "first_purchase": "2016-09-04 21:15:19",
+    "last_purchase": "2018-10-17 17:30:18",
+    "delivery_before_purchase": 0
+  },
+  "customer_quality": {
+    "customer_order_records": 99441,
+    "distinct_customer_ids": 99441,
+    "distinct_real_customers": 96096,
+    "missing_unique_ids": 0,
+    "distinct_cities": 4119,
+    "distinct_states": 27
+  },
+  "lifetime_repeat_purchase": {
+    "customers_with_delivered_orders": 93350,
+    "one_order_customers": 90549,
+    "repeat_customers": 2801,
+    "lifetime_repeat_customer_pct": 3.0005,
+    "avg_delivered_orders": 1.0334,
+    "median_delivered_orders": 1.0,
+    "max_delivered_orders": 15,
+    "first_purchase": "2016-09-15 12:16:38",
+    "last_purchase": "2018-08-29 15:00:37"
+  },
+  "interpretation": {
+    "customer_key": "customer_unique_id",
+    "delivered_order_definition": "order_status=delivered and delivery timestamp is not null",
+    "warning": "Lifetime repeat rate is not the same as second purchase within 90 days."
+  },
+  "distributions": {
+    "order_status": [
+      {
+        "order_status": "delivered",
+        "rows": 96478
+      },
+      {
+        "order_status": "shipped",
+        "rows": 1107
+      },
+      {
+        "order_status": "canceled",
+        "rows": 625
+      },
+      {
+        "order_status": "unavailable",
+        "rows": 609
+      },
+      {
+        "order_status": "invoiced",
+        "rows": 314
+      },
+      {
+        "order_status": "processing",
+        "rows": 301
+      },
+      {
+        "order_status": "created",
+        "rows": 5
+      },
+      {
+        "order_status": "approved",
+        "rows": 2
+      }
+    ],
+    "customer_state": [
+      {
+        "state": "SP",
+        "customers": 40302
+      },
+      {
+        "state": "RJ",
+        "customers": 12384
+      },
+      {
+        "state": "MG",
+        "customers": 11259
+      },
+      {
+        "state": "RS",
+        "customers": 5277
+      },
+      {
+        "state": "PR",
+        "customers": 4882
+      },
+      {
+        "state": "SC",
+        "customers": 3534
+      },
+      {
+        "state": "BA",
+        "customers": 3277
+      },
+      {
+        "state": "DF",
+        "customers": 2075
+      },
+      {
+        "state": "ES",
+        "customers": 1964
+      },
+      {
+        "state": "GO",
+        "customers": 1952
+      },
+      {
+        "state": "PE",
+        "customers": 1609
+      },
+      {
+        "state": "CE",
+        "customers": 1313
+      },
+      {
+        "state": "PA",
+        "customers": 949
+      },
+      {
+        "state": "MT",
+        "customers": 876
+      },
+      {
+        "state": "MA",
+        "customers": 726
+      },
+      {
+        "state": "MS",
+        "customers": 694
+      },
+      {
+        "state": "PB",
+        "customers": 519
+      },
+      {
+        "state": "PI",
+        "customers": 482
+      },
+      {
+        "state": "RN",
+        "customers": 474
+      },
+      {
+        "state": "AL",
+        "customers": 401
+      },
+      {
+        "state": "SE",
+        "customers": 342
+      },
+      {
+        "state": "TO",
+        "customers": 273
+      },
+      {
+        "state": "RO",
+        "customers": 240
+      },
+      {
+        "state": "AM",
+        "customers": 143
+      },
+      {
+        "state": "AC",
+        "customers": 77
+      },
+      {
+        "state": "AP",
+        "customers": 67
+      },
+      {
+        "state": "RR",
+        "customers": 45
+      }
+    ],
+    "payment_type": [
+      {
+        "payment_type": "credit_card",
+        "payment_rows": 76795,
+        "orders": 76505,
+        "avg_payment_value": 163.32
+      },
+      {
+        "payment_type": "boleto",
+        "payment_rows": 19784,
+        "orders": 19784,
+        "avg_payment_value": 145.03
+      },
+      {
+        "payment_type": "voucher",
+        "payment_rows": 5775,
+        "orders": 3866,
+        "avg_payment_value": 65.7
+      },
+      {
+        "payment_type": "debit_card",
+        "payment_rows": 1529,
+        "orders": 1528,
+        "avg_payment_value": 142.57
+      },
+      {
+        "payment_type": "not_defined",
+        "payment_rows": 3,
+        "orders": 3,
+        "avg_payment_value": 0.0
+      }
+    ],
+    "review_score": [
+      {
+        "review_score": 1,
+        "review_rows": 11424
+      },
+      {
+        "review_score": 2,
+        "review_rows": 3151
+      },
+      {
+        "review_score": 3,
+        "review_rows": 8179
+      },
+      {
+        "review_score": 4,
+        "review_rows": 19142
+      },
+      {
+        "review_score": 5,
+        "review_rows": 57328
+      }
+    ],
+    "top_product_categories": [
+      {
+        "category": "cama_mesa_banho",
+        "item_rows": 11115,
+        "orders": 9417
+      },
+      {
+        "category": "beleza_saude",
+        "item_rows": 9670,
+        "orders": 8836
+      },
+      {
+        "category": "esporte_lazer",
+        "item_rows": 8641,
+        "orders": 7720
+      },
+      {
+        "category": "moveis_decoracao",
+        "item_rows": 8334,
+        "orders": 6449
+      },
+      {
+        "category": "informatica_acessorios",
+        "item_rows": 7827,
+        "orders": 6689
+      },
+      {
+        "category": "utilidades_domesticas",
+        "item_rows": 6964,
+        "orders": 5884
+      },
+      {
+        "category": "relogios_presentes",
+        "item_rows": 5991,
+        "orders": 5624
+      },
+      {
+        "category": "telefonia",
+        "item_rows": 4545,
+        "orders": 4199
+      },
+      {
+        "category": "ferramentas_jardim",
+        "item_rows": 4347,
+        "orders": 3518
+      },
+      {
+        "category": "automotivo",
+        "item_rows": 4235,
+        "orders": 3897
+      },
+      {
+        "category": "brinquedos",
+        "item_rows": 4117,
+        "orders": 3886
+      },
+      {
+        "category": "cool_stuff",
+        "item_rows": 3796,
+        "orders": 3632
+      },
+      {
+        "category": "perfumaria",
+        "item_rows": 3419,
+        "orders": 3162
+      },
+      {
+        "category": "bebes",
+        "item_rows": 3065,
+        "orders": 2885
+      },
+      {
+        "category": "eletronicos",
+        "item_rows": 2767,
+        "orders": 2550
+      },
+      {
+        "category": "papelaria",
+        "item_rows": 2517,
+        "orders": 2311
+      },
+      {
+        "category": "fashion_bolsas_e_acessorios",
+        "item_rows": 2031,
+        "orders": 1864
+      },
+      {
+        "category": "pet_shop",
+        "item_rows": 1947,
+        "orders": 1710
+      },
+      {
+        "category": "moveis_escritorio",
+        "item_rows": 1691,
+        "orders": 1273
+      },
+      {
+        "category": "unknown",
+        "item_rows": 1603,
+        "orders": 1451
+      },
+      {
+        "category": "consoles_games",
+        "item_rows": 1137,
+        "orders": 1062
+      },
+      {
+        "category": "malas_acessorios",
+        "item_rows": 1092,
+        "orders": 1034
+      },
+      {
+        "category": "construcao_ferramentas_construcao",
+        "item_rows": 929,
+        "orders": 748
+      },
+      {
+        "category": "eletrodomesticos",
+        "item_rows": 771,
+        "orders": 764
+      },
+      {
+        "category": "instrumentos_musicais",
+        "item_rows": 680,
+        "orders": 628
+      },
+      {
+        "category": "eletroportateis",
+        "item_rows": 679,
+        "orders": 630
+      },
+      {
+        "category": "casa_construcao",
+        "item_rows": 604,
+        "orders": 490
+      },
+      {
+        "category": "livros_interesse_geral",
+        "item_rows": 553,
+        "orders": 512
+      },
+      {
+        "category": "alimentos",
+        "item_rows": 510,
+        "orders": 450
+      },
+      {
+        "category": "moveis_sala",
+        "item_rows": 503,
+        "orders": 422
+      }
+    ]
+  }
+}
