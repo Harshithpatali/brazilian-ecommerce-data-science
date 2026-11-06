@@ -12,7 +12,9 @@ def valid_metadata():
         "evaluation_positive_class": "purchase_within_90_days (SQL churned=0)",
         "repeat_purchase_probability_threshold": 0.03,
         "feature_availability": {
-            "review_score": "review_answer_timestamp < snapshot_date"
+            "review_score": "review_answer_timestamp < snapshot_date",
+            "lifetime_history": "purchase_timestamp < snapshot_date and delivered_timestamp < snapshot_date",
+            "prior_order_window": "[snapshot_date - 360 days, snapshot_date - 180 days)"
         },
         "model_sha256": "a" * 64,
         "threshold": 0.97,
@@ -22,6 +24,7 @@ def valid_metadata():
             "precision": 0.40,
             "recall": 0.45,
             "f1": 0.42,
+            "f2": 0.55,
             "class_0_precision": 0.40,
             "class_0_recall": 0.45,
             "class_0_f1": 0.42,
@@ -140,3 +143,21 @@ def test_churn_and_repeat_probability_thresholds_must_be_complements():
     metadata["test_metrics"]["threshold"] = 0.90
     errors = validate_model_metadata(metadata)
     assert any("must be complementary" in error for error in errors)
+
+
+
+def test_model_contract_requires_f2_and_recall_oriented_threshold_policy():
+    metadata = valid_metadata()
+    metadata["test_metrics"].pop("f2")
+    metadata["threshold_selection"] = "maximum F1"
+    errors = validate_model_metadata(metadata)
+    assert any("test_metrics.f2" in error for error in errors)
+    assert any("threshold_selection" in error for error in errors)
+
+
+def test_model_contract_rejects_future_looking_lifetime_feature_definition():
+    metadata = valid_metadata()
+    metadata["feature_availability"]["lifetime_history"] = (
+        "all historical and future orders"
+    )
+    assert any("lifetime history" in error for error in validate_model_metadata(metadata))
