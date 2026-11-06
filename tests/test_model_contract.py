@@ -75,6 +75,7 @@ def valid_metadata():
         "customer_cluster_bootstrap_pr_auc_ci95": {
             "lower_95": 0.58, "upper_95": 0.68, "valid_replicates": 200
         },
+        "known_customer_test_metrics": {"rows": 50, "customers": 30},
         "unseen_customer_test_metrics": {"rows": 100, "customers": 80},
         "known_customer_test_metrics": {"rows": 50, "customers": 30},
         "dummy_baseline": {
