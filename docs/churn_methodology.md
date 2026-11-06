@@ -72,7 +72,7 @@ The holdout is not used for model or threshold selection.
 ## Imbalance and baseline reporting
 
 Report class counts and prevalence for each partition, average precision,
-ROC-AUC, thresholded precision/recall/F1, confusion matrix, classification
+ROC-AUC, per-class precision/recall/F1, balanced accuracy, Matthews correlation coefficient, confusion matrix, classification
 report, and a DummyClassifier prior-probability average-precision baseline.
 
 Interpret average precision relative to positive-class prevalence. A high
