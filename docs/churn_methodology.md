@@ -46,7 +46,11 @@ The 90-day and 30-day order/revenue counts are nested windows inside the
 180-day window.
 
 Additional features include:
-- prior activity in \`[t - 360 days, t - 180 days)\`;
+- prior activity in `[t - 360 days, t - 180 days)`;
+- first-order basket value, item/product/category/seller counts and freight share;
+- first-order payment type, payment installments and credit-card/boleto/debit/voucher indicators;
+- first-order approval lag, delivery duration, delivery delay and review score;
+- rolling 180-day averages for basket size, category/seller diversity, installments, credit-card share and freight share;
 - lifetime delivered-order count and customer tenure;
 - positive interpurchase-gap count, average/median positive gap, gap
   coefficient of variation, zero-gap share for simultaneous purchase
