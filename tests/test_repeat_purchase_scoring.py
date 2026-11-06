@@ -4,10 +4,11 @@ from sklearn.linear_model import LogisticRegression
 
 from src.models.train_churn import (
     CalibratedRepeatPurchaseModel,
-    assign_monthly_capacity,
-    choose_fbeta_threshold,
-    repeat_purchase_average_precision_scorer,
     _logit,
+    assign_monthly_capacity,
+    customer_bootstrap_capacity_ci,
+    customer_bootstrap_pr_auc_ci,
+    repeat_purchase_average_precision_scorer,
 )
 
 
@@ -44,54 +45,8 @@ def test_cv_scorer_ranks_repeat_purchase_event_not_majority_churn_event():
     )
 
 
-def test_f2_threshold_prefers_recall_at_least_as_much_as_f1():
-    y_churned = np.array([0, 0, 0, 1, 1, 1])
-    churn_probabilities = np.array([0.1, 0.4, 0.7, 0.8, 0.9, 0.95])
-
-    _, f1_metrics = choose_fbeta_threshold(
-        y_churned, churn_probabilities, beta=1.0
-    )
-    f2_churn_cutoff, f2_metrics = choose_fbeta_threshold(
-        y_churned, churn_probabilities, beta=2.0
-    )
-
-    assert f2_metrics["recall"] >= f1_metrics["recall"]
-    assert f2_metrics["repeat_purchase_probability_threshold"] <= (
-        f1_metrics["repeat_purchase_probability_threshold"]
-    )
-    assert abs(
-        f2_churn_cutoff + f2_metrics["repeat_purchase_probability_threshold"] - 1.0
-    ) < 1e-12
-    assert f2_metrics["f2"] >= 0.0
-
-
-def test_fbeta_rejects_non_positive_beta():
-    y_churned = np.array([0, 1])
-    probabilities = np.array([0.1, 0.9])
-    try:
-        choose_fbeta_threshold(y_churned, probabilities, beta=0)
-    except ValueError as exc:
-        assert "beta" in str(exc)
-    else:
-        raise AssertionError("Expected an invalid beta to raise ValueError")
-
-
-def test_candidate_models_include_catboost_native_categorical_candidate():
-    from src.models.train_churn import build_models
-
-    models = build_models()
-    assert {
-        "logistic_regression",
-        "hist_gradient_boosting",
-        "random_forest",
-        "catboost",
-    } <= set(models)
-
-
 def test_monthly_capacity_flags_exact_share_and_ranks_within_month():
-    dates = pd.to_datetime([
-        "2018-01-01"] * 10 + ["2018-02-01"] * 10
-    )
+    dates = pd.to_datetime(["2018-01-01"] * 10 + ["2018-02-01"] * 10)
     scores = np.arange(20, dtype=float)
     labels = np.array([0] * 5 + [1] * 5 + [0] * 5 + [1] * 5)
 
@@ -130,13 +85,11 @@ def test_monthly_capacity_rejects_invalid_fraction_and_mismatched_lengths():
         raise AssertionError("Mismatched lengths must fail")
 
 
-def test_calibrated_wrapper_preserves_repeat_and_churn_probability_order():
+def test_calibrated_wrapper_preserves_repeat_and_no_purchase_probability_order():
     y = np.array([0, 1, 0, 1, 0, 1, 0, 1])
     raw_repeat = np.array([0.8, 0.2, 0.7, 0.3, 0.6, 0.4, 0.9, 0.1])
     calibrator = LogisticRegression().fit(_logit(raw_repeat), y)
-    model = CalibratedRepeatPurchaseModel(
-        FixedEstimator(raw_repeat), calibrator
-    )
+    model = CalibratedRepeatPurchaseModel(FixedEstimator(raw_repeat), calibrator)
 
     probabilities = model.predict_proba(pd.DataFrame({"feature": range(8)}))
     assert probabilities.shape == (8, 2)
@@ -146,9 +99,7 @@ def test_calibrated_wrapper_preserves_repeat_and_churn_probability_order():
     assert np.array_equal(model.classes_, np.array([0, 1]))
 
 
-def test_customer_bootstrap_interval_is_reproducible_and_bounded():
-    from src.models.train_churn import customer_bootstrap_pr_auc_ci
-
+def test_customer_bootstrap_pr_auc_interval_is_reproducible_and_bounded():
     y = np.array([1, 0, 1, 0] * 20)
     scores = np.array([0.9, 0.1, 0.7, 0.2] * 20)
     customer_ids = np.array([f"c{i // 2}" for i in range(80)])
@@ -158,3 +109,32 @@ def test_customer_bootstrap_interval_is_reproducible_and_bounded():
     )
     assert 0 <= ci["lower_95"] <= ci["upper_95"] <= 1
     assert ci["replicates"] >= 30
+
+
+def test_customer_bootstrap_capacity_ci_reports_valid_bounds():
+    y = np.array([1, 0, 1, 0] * 30)
+    scores = np.array([0.9, 0.1, 0.7, 0.2] * 30)
+    dates = pd.to_datetime(["2018-01-01"] * 120)
+    customer_ids = np.array([f"c{i // 2}" for i in range(120)])
+
+    ci = customer_bootstrap_capacity_ci(
+        y, scores, dates, customer_ids,
+        capacity_fraction=0.25, n_bootstrap=50, random_state=29,
+    )
+    for metric in ("precision", "recall", "flagged_fraction"):
+        assert 0 <= ci[metric]["lower_95"] <= ci[metric]["upper_95"] <= 1
+        assert ci[metric]["replicates"] >= 30
+    assert ci["lift"]["lower_95"] >= 0
+    assert ci["lift"]["upper_95"] >= ci["lift"]["lower_95"]
+
+
+def test_candidate_models_include_catboost_native_categorical_candidate():
+    from src.models.train_churn import build_models
+
+    models = build_models()
+    assert {
+        "logistic_regression",
+        "hist_gradient_boosting",
+        "random_forest",
+        "catboost",
+    } <= set(models)
