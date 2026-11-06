@@ -252,7 +252,7 @@ Every script is designed to be **rerunnable against a live database** without ma
 - **Snapshot logic:** monthly snapshots begin after the customer's second delivered order. A snapshot is included only when the full 90-day forward observation window is present. All eligible snapshots remain in the dataset, allowing customers to reactivate after a period of inactivity.
 - **Target:** `churned = 1` when no eventually-delivered order has a purchase timestamp in the half-open interval `[snapshot_date, snapshot_date + 90 days)`. A purchase exactly at the 90-day boundary is outside the window.
 - **Leakage control:** historical orders must be purchased and delivered before the snapshot; review scores are included only when `review_answer_timestamp` is before the snapshot, and multiple review rows are averaged within each order before customer-level aggregation. Future orders are used only to create the target. Snapshots without a complete 90-day future window are excluded.
-- **Features:** 30/90/180-day order and revenue windows, prior-180-day activity, lifetime delivered-order count, customer tenure, average/median interpurchase gaps, gap variability, recency-to-cycle ratio, review score, delivery delay and purchase-frequency trends.
+- **Features:** 30/90/180-day order and revenue windows, prior-180-day activity, lifetime delivered-order count, customer tenure, average/median interpurchase gaps, gap variability, zero-gap share for simultaneous orders, recency-to-cycle ratio, review score, delivery delay and purchase-frequency trends.
 
 ### Class imbalance and evaluation target
 
