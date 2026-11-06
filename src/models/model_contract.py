@@ -6,7 +6,7 @@ from typing import Any
 
 from src.features.churn_features import FEATURE_COLS
 
-MODEL_VERSION = "churn-pit-v4"
+MODEL_VERSION = "churn-pit-v5"
 
 _REQUIRED_METRICS = (
     "roc_auc",
