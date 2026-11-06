@@ -31,7 +31,7 @@ the next period are excluded from the earlier partition.
 
 - Validation selects a classification threshold by maximum F1.
 - The final test period is evaluated once after the model and threshold are frozen.
-- The selected model is compared with a DummyClassifier prior-probability baseline.
+- The selected model is compared with a DummyClassifier prior-probability baseline. Reports include per-class precision/recall/F1, balanced accuracy, and Matthews correlation coefficient so minority-class behavior is visible.
 - The F1 threshold is not business-optimal without an intervention cost model.
 
 ## Outputs
