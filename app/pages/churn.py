@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -26,8 +27,14 @@ def load_features() -> pd.DataFrame:
 
 
 @st.cache_resource
-def load_model():
-    return joblib.load(MODEL_PATH) if MODEL_PATH.exists() else None
+def load_model(model_path: str, expected_sha256: str):
+    path = Path(model_path)
+    if not path.exists():
+        return None
+    actual_sha256 = hashlib.sha256(path.read_bytes()).hexdigest()
+    if actual_sha256 != expected_sha256:
+        raise ValueError("Model binary SHA-256 does not match model_metadata.json.")
+    return joblib.load(path)
 
 
 @st.cache_data
@@ -47,7 +54,12 @@ def render() -> None:
         "Customer Churn Intelligence",
         "Historical point-in-time customer scoring using a 90-day forward inactivity target.",
     )
-    metadata = load_metadata()
+    try:
+        metadata = load_metadata()
+    except (OSError, json.JSONDecodeError) as exc:
+        st.error(f"Could not read churn model metadata: {exc}")
+        return
+
     contract_errors = validate_model_metadata(metadata)
     if contract_errors:
         st.warning(
@@ -65,12 +77,20 @@ def render() -> None:
         )
         return
 
-    model = load_model()
+    try:
+        model = load_model(str(MODEL_PATH), metadata["model_sha256"])
+    except (OSError, ValueError, AttributeError) as exc:
+        st.error(f"Could not load the selected model artifact: {exc}")
+        return
     if model is None:
         st.warning("The selected model artifact is missing. Run the training pipeline.")
         return
 
-    df = load_features().copy()
+    try:
+        df = load_features().copy()
+    except (OSError, ValueError) as exc:
+        st.error(f"Could not load the historical churn scoring dataset: {exc}")
+        return
     if df.empty:
         st.info("No historical churn snapshots are available.")
         return
@@ -87,7 +107,11 @@ def render() -> None:
     if missing:
         st.error(f"Scoring dataset is missing features: {missing}")
         return
-    latest["churn_probability"] = model.predict_proba(features[FEATURE_COLS])[:, 1]
+    try:
+        latest["churn_probability"] = model.predict_proba(features[FEATURE_COLS])[:, 1]
+    except (ValueError, AttributeError, KeyError) as exc:
+        st.error(f"Could not score the latest historical snapshot: {exc}")
+        return
 
     threshold = float(metadata["threshold"])
     high_risk = latest[latest["churn_probability"] >= threshold].copy()
