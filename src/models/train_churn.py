@@ -418,7 +418,9 @@ def main() -> None:
 
     precision, recall, pr_thresholds = precision_recall_curve(y_test_repeat, test_repeat_prob)
     pd.DataFrame({
-        "precision": precision[:-1], "recall": recall[:-1], "threshold": pr_thresholds
+        "precision": precision[:-1],
+        "recall": recall[:-1],
+        "repeat_purchase_probability_threshold": pr_thresholds,
     }).to_csv(MODEL_DIR / "test_precision_recall_curve.csv", index=False)
 
     report_path = MODEL_DIR / "test_classification_report.json"
