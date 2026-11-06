@@ -125,6 +125,8 @@ def make_date_grouped_splits(
     y: pd.Series | np.ndarray | None = None,
     n_splits: int = 4,
     horizon_days: int = 90,
+    min_train_repeat_events: int = 1,
+    min_validation_repeat_events: int = 1,
 ) -> list[tuple[np.ndarray, np.ndarray]]:
     """
     Build expanding-window folds over unique dates with a purged label gap.
@@ -139,6 +141,8 @@ def make_date_grouped_splits(
     unique = pd.DatetimeIndex(sorted(row_dates.unique())).to_numpy(dtype="datetime64[ns]")
     if n_splits < 2 or len(unique) < n_splits + 5:
         raise ValueError("Not enough unique dates for purged temporal CV.")
+    if min_train_repeat_events < 1 or min_validation_repeat_events < 1:
+        raise ValueError("Minimum repeat-purchase event counts must be positive.")
 
     values = row_dates.to_numpy()
     labels = None if y is None else np.asarray(pd.Series(y).reset_index(drop=True))
@@ -183,6 +187,14 @@ def make_date_grouped_splits(
                         valid_candidate = False
                         break
                     if len(np.unique(labels[validation_idx])) != 2:
+                        valid_candidate = False
+                        break
+                    # SQL churned=0 is the second-purchase event. Reject folds
+                    # whose minority-event support is too small for meaningful AP.
+                    if int((labels[fit_idx] == 0).sum()) < min_train_repeat_events:
+                        valid_candidate = False
+                        break
+                    if int((labels[validation_idx] == 0).sum()) < min_validation_repeat_events:
                         valid_candidate = False
                         break
                 candidate_folds.append((fit_idx, validation_idx))
@@ -558,7 +570,11 @@ def main() -> None:
     train_dates = df["snapshot_date"].iloc[train_idx].reset_index(drop=True)
     n_dates = int(train_dates.dt.normalize().nunique())
     folds = make_date_grouped_splits(
-        train_dates, y=y_train, n_splits=min(4, n_dates - 5)
+        train_dates,
+        y=y_train,
+        n_splits=min(4, n_dates - 5),
+        min_train_repeat_events=10,
+        min_validation_repeat_events=5,
     )
 
     experiment = configure_mlflow()
