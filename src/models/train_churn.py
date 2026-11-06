@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 from typing import Any
@@ -16,12 +17,15 @@ from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
     average_precision_score, classification_report, confusion_matrix,
-    f1_score, precision_recall_curve, precision_score, recall_score, roc_auc_score,
+    balanced_accuracy_score, f1_score, matthews_corrcoef, precision_recall_curve,
+    precision_score, recall_score, roc_auc_score,
 )
 from sklearn.model_selection import GridSearchCV, TimeSeriesSplit
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
+from src.features.churn_features import FEATURE_COLS
+from src.models.model_contract import MODEL_VERSION
 from .mlflow_utils import configure_mlflow, get_tracking_uri
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -29,16 +33,6 @@ DATA = ROOT / "data" / "ml" / "customer_churn_dataset.parquet"
 MODEL_DIR = ROOT / "models"
 MODEL_DIR.mkdir(exist_ok=True)
 
-MODEL_VERSION = "churn-pit-v2"
-FEATURE_COLS = [
-    "orders_180d", "orders_90d", "orders_30d",
-    "revenue_180d", "revenue_90d", "revenue_30d",
-    "avg_order_value_180d", "avg_review_score_180d",
-    "avg_delivery_delay_180d", "active_months_180d",
-    "recency_days", "recent_order_share", "recent_revenue_share",
-    "orders_per_active_month", "revenue_per_order",
-    "recent_vs_older_order_ratio",
-]
 
 
 def _dates(values: pd.Series | list[Any]) -> pd.Series:
@@ -355,6 +349,11 @@ def main() -> None:
         "precision": float(precision_score(y_test, test_pred, zero_division=0)),
         "recall": float(recall_score(y_test, test_pred, zero_division=0)),
         "f1": float(f1_score(y_test, test_pred, zero_division=0)),
+        "class_0_precision": float(precision_score(y_test, test_pred, pos_label=0, zero_division=0)),
+        "class_0_recall": float(recall_score(y_test, test_pred, pos_label=0, zero_division=0)),
+        "class_0_f1": float(f1_score(y_test, test_pred, pos_label=0, zero_division=0)),
+        "balanced_accuracy": float(balanced_accuracy_score(y_test, test_pred)),
+        "matthews_corrcoef": float(matthews_corrcoef(y_test, test_pred)),
         "positive_prevalence": float(y_test.mean()),
         "threshold": float(threshold),
     }
@@ -416,6 +415,14 @@ def main() -> None:
             "[snapshot_date, snapshot_date + 90 days); otherwise 0."
         ),
         "feature_columns": FEATURE_COLS,
+        "feature_availability": {
+            "historical_orders": (
+                "order_purchase_timestamp < snapshot_date and "
+                "order_delivered_customer_date < snapshot_date"
+            ),
+            "review_score": "review_answer_timestamp < snapshot_date",
+            "future_orders": "used only to construct the target, never as predictors",
+        },
         "feature_window_days": 180,
         "prediction_window_days": 90,
         "label_horizon_embargo_days": 90,
@@ -439,6 +446,7 @@ def main() -> None:
             "test_pr_auc": dummy_pr_auc,
             "test_positive_prevalence": float(y_test.mean()),
         },
+        "model_sha256": hashlib.sha256(model_path.read_bytes()).hexdigest(),
         "artifacts": {
             "model": "models/best_churn_model.joblib",
             "comparison": "models/model_comparison.csv",

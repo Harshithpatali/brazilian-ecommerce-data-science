@@ -41,7 +41,8 @@ and 30-day order/revenue counts are nested windows within the 180-day window.
 
 Other features include average order value, average delivery delay, active
 purchase months, recency, order/revenue shares, and order-value ratios. Review
-scores are included only when the review-creation timestamp precedes t.
+scores are included only when the review-answer timestamp precedes t, because
+the score is not observable until the customer submits the review.
 
 ## Temporal evaluation protocol
 
@@ -71,7 +72,7 @@ The holdout is not used for model or threshold selection.
 ## Imbalance and baseline reporting
 
 Report class counts and prevalence for each partition, average precision,
-ROC-AUC, thresholded precision/recall/F1, confusion matrix, classification
+ROC-AUC, per-class precision/recall/F1, balanced accuracy, Matthews correlation coefficient, confusion matrix, classification
 report, and a DummyClassifier prior-probability average-precision baseline.
 
 Interpret average precision relative to positive-class prevalence. A high

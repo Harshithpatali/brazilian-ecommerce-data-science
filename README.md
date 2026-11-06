@@ -251,7 +251,7 @@ Every script is designed to be **rerunnable against a live database** without ma
 - **Population:** customers who have reached their second delivered order and have at least one order purchased and delivered in the prior 180 days.
 - **Snapshot logic:** monthly snapshots begin after the customer's second delivered order. A snapshot is included only when the full 90-day forward observation window is present. All eligible snapshots remain in the dataset, allowing customers to reactivate after a period of inactivity.
 - **Target:** `churned = 1` when no eventually-delivered order has a purchase timestamp in the half-open interval `[snapshot_date, snapshot_date + 90 days)`. A purchase exactly at the 90-day boundary is outside the window.
-- **Leakage control:** historical orders must be purchased and delivered before the snapshot; review scores are included only when the review was created before the snapshot. Future orders are used only to create the target. Snapshots without a complete 90-day future window are excluded.
+- **Leakage control:** historical orders must be purchased and delivered before the snapshot; review scores are included only when `review_answer_timestamp` is before the snapshot, and multiple review rows are averaged within each order before customer-level aggregation. Future orders are used only to create the target. Snapshots without a complete 90-day future window are excluded.
 - **Features:** 30/90/180-day rolling order counts and revenue, average order value, average review score, average delivery delay, active months, recency, recent order/revenue share, orders per active month, revenue per order, and recent-vs-older order ratio.
 
 ### Model comparison
@@ -283,11 +283,11 @@ flowchart LR
 
 The performance-optimized build first materializes delivered orders into a compact `ml.delivered_orders` table, aggregates to `ml.customer_monthly_activity`, and only then constructs the point-in-time dataset — avoiding an expensive snapshot × full-order-history join and reducing the risk of Supabase statement timeouts on large SQL builds.
 
-Temporal-CV runs, hyperparameters and final selected-model evaluation are tracked with **MLflow**. The selected pipeline is persisted to `models/best_churn_model.joblib` and loaded directly by Streamlit — no separate model-serving API is required. Model selection uses cross-validation PR-AUC; validation selects the F1 threshold; the final test period is evaluated once. A 90-day purge prevents training/validation label windows from overlapping the next period.
+Temporal-CV runs, hyperparameters and final selected-model evaluation are tracked with **MLflow**. The selected pipeline is persisted to `models/best_churn_model.joblib` and loaded directly by Streamlit — no separate model-serving API is required. Model selection uses cross-validation PR-AUC; validation selects the F1 threshold; the final test period is evaluated once. Reports include class-specific metrics, balanced accuracy and Matthews correlation coefficient. A 90-day purge prevents training/validation label windows from overlapping the next period.
 
 See [`docs/churn_methodology.md`](docs/churn_methodology.md), [`docs/ml_modeling.md`](docs/ml_modeling.md), and [`docs/model_card.md`](docs/model_card.md) for full details, including known limitations.
 
-> The model artifacts currently committed to the repository predate the corrected `churn-pit-v2` pipeline. The Churn page remains disabled until the PostgreSQL dataset is rebuilt and the corrected model artifacts are generated with `python -m scripts.run_ml`.
+> The model artifacts currently committed to the repository predate the corrected `churn-pit-v3` pipeline. The Churn page remains disabled until the PostgreSQL dataset is rebuilt and the corrected model artifacts are generated with `python -m scripts.run_ml`.
 
 ## 📊 Statistical Analysis
 
@@ -392,7 +392,7 @@ python scripts/check_connection.py
 
 ### 5. Build the full SQL analytical layer + ML dataset
 
-The simplest path is the single orchestrator script, which runs every SQL folder in order:
+The simplest path is the single orchestrator script. It first performs a read-only preflight of the nine required Olist source tables/columns, then runs each SQL folder in order. If the connected database is not the expected Olist database, the build stops before any project DDL runs:
 
 ```bash
 python -m scripts.build_all
@@ -419,7 +419,7 @@ python scripts/run_sql_folder.py sql/15_reporting
 
 ```bash
 python scripts/build_dashboard_data.py   # writes data/dashboard/
-python scripts/build_ml_data.py          # writes data/ml/customer_features.parquet
+python scripts/build_ml_data.py          # writes data/ml/customer_churn_dataset.parquet
 ```
 
 ### 7. Train the churn model

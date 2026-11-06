@@ -2,7 +2,7 @@
 
 ## Status
 
-The corrected pipeline version is churn-pit-v2. Existing checked-in model
+The corrected pipeline version is churn-pit-v3. Existing checked-in model
 artifacts were generated before the corrected target and evaluation protocol.
 They must be regenerated from the configured PostgreSQL database before the
 dashboard can serve the updated churn model.
@@ -26,7 +26,7 @@ days after the snapshot. A purchase exactly on the 90-day boundary is outside.
 
 Historical order activity is restricted to the 180 days before the snapshot.
 Orders must already have been delivered by the snapshot. Review scores are
-included only when their review-creation timestamps precede the snapshot.
+included only when their review-answer timestamps precede the snapshot.
 Future observations are used only to construct the target.
 
 ## Models and evaluation
@@ -36,8 +36,9 @@ and hyperparameters are selected with expanding-window temporal CV grouped by
 unique snapshot dates. The threshold is selected on a separate validation
 period by maximizing F1. The final chronological holdout is evaluated once.
 
-Reports include class prevalence, average precision, ROC-AUC, thresholded
-precision/recall/F1, confusion matrix, and prior-probability dummy baseline.
+Reports include class prevalence, average precision, ROC-AUC, per-class
+precision/recall/F1, balanced accuracy, Matthews correlation coefficient,
+confusion matrix, and prior-probability dummy baseline.
 
 ## Limitations
 

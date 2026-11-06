@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -9,7 +10,7 @@ import streamlit as st
 
 from app.components.ui import hero, metric_card, section_title
 from src.features.churn_features import FEATURE_COLS, add_churn_features
-from src.models.train_churn import MODEL_VERSION
+from src.models.model_contract import validate_model_metadata
 
 ROOT = Path(__file__).resolve().parents[2]
 DATA_PATH = ROOT / "data" / "ml" / "customer_churn_dataset.parquet"
@@ -26,8 +27,14 @@ def load_features() -> pd.DataFrame:
 
 
 @st.cache_resource
-def load_model():
-    return joblib.load(MODEL_PATH) if MODEL_PATH.exists() else None
+def load_model(model_path: str, expected_sha256: str):
+    path = Path(model_path)
+    if not path.exists():
+        return None
+    actual_sha256 = hashlib.sha256(path.read_bytes()).hexdigest()
+    if actual_sha256 != expected_sha256:
+        raise ValueError("Model binary SHA-256 does not match model_metadata.json.")
+    return joblib.load(path)
 
 
 @st.cache_data
@@ -47,13 +54,21 @@ def render() -> None:
         "Customer Churn Intelligence",
         "Historical point-in-time customer scoring using a 90-day forward inactivity target.",
     )
-    metadata = load_metadata()
-    if metadata.get("model_version") != MODEL_VERSION or metadata.get("pipeline_status") != "ready":
+    try:
+        metadata = load_metadata()
+    except (OSError, json.JSONDecodeError) as exc:
+        st.error(f"Could not read churn model metadata: {exc}")
+        return
+
+    contract_errors = validate_model_metadata(metadata)
+    if contract_errors:
         st.warning(
-            "The checked-in churn model predates the corrected target and evaluation "
-            "workflow. Rebuild the PostgreSQL churn dataset, run the corrected training "
-            "pipeline, and redeploy the resulting model artifacts before using this page."
+            "The churn model artifacts are missing, stale, or inconsistent. "
+            "Rebuild the PostgreSQL churn dataset, run the corrected training "
+            "pipeline, and redeploy the new model artifacts."
         )
+        for error in contract_errors:
+            st.write(f"- {error}")
         st.code(
             "python -m scripts.build_all\n"
             "python -m scripts.validate_churn_data\n"
@@ -62,12 +77,20 @@ def render() -> None:
         )
         return
 
-    model = load_model()
+    try:
+        model = load_model(str(MODEL_PATH), metadata["model_sha256"])
+    except (OSError, ValueError, AttributeError) as exc:
+        st.error(f"Could not load the selected model artifact: {exc}")
+        return
     if model is None:
         st.warning("The selected model artifact is missing. Run the training pipeline.")
         return
 
-    df = load_features().copy()
+    try:
+        df = load_features().copy()
+    except (OSError, ValueError) as exc:
+        st.error(f"Could not load the historical churn scoring dataset: {exc}")
+        return
     if df.empty:
         st.info("No historical churn snapshots are available.")
         return
@@ -84,7 +107,11 @@ def render() -> None:
     if missing:
         st.error(f"Scoring dataset is missing features: {missing}")
         return
-    latest["churn_probability"] = model.predict_proba(features[FEATURE_COLS])[:, 1]
+    try:
+        latest["churn_probability"] = model.predict_proba(features[FEATURE_COLS])[:, 1]
+    except (ValueError, AttributeError, KeyError) as exc:
+        st.error(f"Could not score the latest historical snapshot: {exc}")
+        return
 
     threshold = float(metadata["threshold"])
     high_risk = latest[latest["churn_probability"] >= threshold].copy()
@@ -104,7 +131,7 @@ def render() -> None:
         with column:
             metric_card(label, value, help_text=help_text, accent=accent)
 
-    test = metadata.get("test_metrics", {})
+    test_metrics = metadata["test_metrics"]
     baseline = metadata.get("dummy_baseline", {})
     section_title(
         "Final chronological test evaluation",
@@ -112,14 +139,53 @@ def render() -> None:
     )
     metric_columns = st.columns(4)
     values = [
-        ("Test PR-AUC", test.get("pr_auc"), "Average precision"),
+        ("Test PR-AUC", test_metrics.get("pr_auc"), "Average precision"),
         ("Dummy PR-AUC", baseline.get("test_pr_auc"), "Prior-probability baseline"),
-        ("Test ROC-AUC", test.get("roc_auc"), "Threshold independent"),
-        ("Test F1", test.get("f1"), f"Validation threshold {threshold:.3f}"),
+        ("Test ROC-AUC", test_metrics.get("roc_auc"), "Threshold independent"),
+        ("Test F1", test_metrics.get("f1"), f"Validation threshold {threshold:.3f}"),
     ]
     for column, (label, value, help_text) in zip(metric_columns, values):
         with column:
             metric_card(label, "N/A" if value is None else f"{float(value):.3f}", help_text=help_text)
+
+    section_title(
+        "Per-class test performance",
+        "Class 0 is a delivered purchase within 90 days; class 1 is no delivered purchase.",
+    )
+    class_report = pd.DataFrame([
+        {
+            "Class": "Purchase within 90 days (0)",
+            "Precision": test_metrics["class_0_precision"],
+            "Recall": test_metrics["class_0_recall"],
+            "F1": test_metrics["class_0_f1"],
+        },
+        {
+            "Class": "No delivered purchase (1)",
+            "Precision": test_metrics["precision"],
+            "Recall": test_metrics["recall"],
+            "F1": test_metrics["f1"],
+        },
+    ])
+    st.dataframe(
+        class_report.style.format({
+            "Precision": "{:.3f}", "Recall": "{:.3f}", "F1": "{:.3f}"
+        }),
+        use_container_width=True,
+        hide_index=True,
+    )
+    quality_columns = st.columns(2)
+    with quality_columns[0]:
+        metric_card(
+            "Balanced accuracy",
+            f"{test_metrics['balanced_accuracy']:.3f}",
+            help_text="Average recall across both classes",
+        )
+    with quality_columns[1]:
+        metric_card(
+            "Matthews correlation",
+            f"{test_metrics['matthews_corrcoef']:.3f}",
+            help_text="Correlation-based score using all confusion-matrix cells",
+        )
     prevalence = baseline.get("test_positive_prevalence")
     if prevalence is not None:
         st.caption(f"Test positive prevalence: {float(prevalence):.1%}. Interpret PR-AUC relative to this baseline.")
@@ -234,7 +300,7 @@ def render() -> None:
             "threshold": metadata.get("threshold"),
             "periods": metadata.get("periods", {}),
             "class_distribution": metadata.get("class_distribution", {}),
-            "test_metrics": test,
+            "test_metrics": test_metrics,
             "dummy_baseline": baseline,
             "best_params": metadata.get("best_params", {}),
             "features": metadata.get("feature_columns", []),

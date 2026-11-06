@@ -73,3 +73,28 @@ SELECT
 FROM ml.customer_churn_dataset
 GROUP BY churned
 ORDER BY churned;
+
+
+/* Expected review_feature_mismatch_count: zero.
+   Recompute an order-weighted average using only reviews answered by the
+   snapshot. This detects use of review scores before they were observable. */
+SELECT COUNT(*) AS review_feature_mismatch_count
+FROM ml.customer_churn_dataset dataset
+CROSS JOIN LATERAL (
+    SELECT AVG(order_review.order_avg_review_score)::numeric
+        AS expected_avg_review_score_180d
+    FROM ml.delivered_orders d
+    CROSS JOIN LATERAL (
+        SELECT AVG(r.review_score)::numeric AS order_avg_review_score
+        FROM ml.review_events r
+        WHERE r.order_id = d.order_id
+          AND r.review_answer_timestamp < dataset.snapshot_date
+    ) order_review
+    WHERE d.customer_unique_id = dataset.customer_unique_id
+      AND d.order_purchase_timestamp >= dataset.snapshot_date - INTERVAL '180 days'
+      AND d.order_purchase_timestamp < dataset.snapshot_date
+      AND d.order_delivered_customer_date < dataset.snapshot_date
+      AND order_review.order_avg_review_score IS NOT NULL
+) expected
+WHERE dataset.avg_review_score_180d
+      IS DISTINCT FROM expected.expected_avg_review_score_180d;

@@ -10,6 +10,36 @@ if str(ROOT) not in sys.path:
 from src.database.io import query_to_dataframe
 
 
+EXPECTED_ZERO_CHECKS = (
+    "duplicate_keys",
+    "target_mismatches",
+    "invalid_feature_rows",
+    "incomplete_label_windows",
+    "review_feature_mismatches",
+)
+
+
+def assert_zero_integrity_checks(checks: dict[str, object]) -> None:
+    """Fail validation if an integrity check is missing or non-zero."""
+    missing = [name for name in EXPECTED_ZERO_CHECKS if name not in checks]
+    if missing:
+        raise SystemExit(f"Validation result is missing checks: {missing}")
+
+    violations = {}
+    for name in EXPECTED_ZERO_CHECKS:
+        try:
+            count = int(checks[name])
+        except (TypeError, ValueError) as exc:
+            raise SystemExit(
+                f"Validation check {name!r} did not return an integer."
+            ) from exc
+        if count != 0:
+            violations[name] = count
+
+    if violations:
+        raise SystemExit(f"Churn data validation failed: {violations}")
+
+
 def main() -> None:
     summary = query_to_dataframe("""
         SELECT COUNT(*) AS rows,
@@ -46,6 +76,10 @@ def main() -> None:
     print(monthly.to_string(index=False))
 
     checks = query_to_dataframe("""
+        WITH source_end AS (
+            SELECT MAX(order_purchase_timestamp) AS max_purchase_timestamp
+            FROM analytics.order_level
+        )
         SELECT
           (SELECT COUNT(*) FROM (
               SELECT customer_unique_id, snapshot_date
@@ -59,10 +93,41 @@ def main() -> None:
                     AND f.order_purchase_timestamp >= dataset.snapshot_date
                     AND f.order_purchase_timestamp < dataset.snapshot_date + INTERVAL '90 days'
               ) THEN 0 ELSE 1 END
-           ) FROM ml.customer_churn_dataset dataset) AS target_mismatches
+           ) FROM ml.customer_churn_dataset dataset) AS target_mismatches,
+          (SELECT COUNT(*) FILTER (
+              WHERE orders_180d <= 0 OR recency_days < 0 OR recency_days > 180
+           ) FROM ml.customer_churn_dataset) AS invalid_feature_rows,
+          (SELECT COUNT(*)
+           FROM ml.customer_churn_dataset dataset
+           CROSS JOIN source_end
+           WHERE dataset.snapshot_date + INTERVAL '90 days'
+                 > source_end.max_purchase_timestamp) AS incomplete_label_windows,
+          (SELECT COUNT(*)
+           FROM ml.customer_churn_dataset dataset
+           CROSS JOIN LATERAL (
+               SELECT AVG(order_review.order_avg_review_score)::numeric
+                   AS expected_avg_review_score_180d
+               FROM ml.delivered_orders d
+               CROSS JOIN LATERAL (
+                   SELECT AVG(r.review_score)::numeric AS order_avg_review_score
+                   FROM ml.review_events r
+                   WHERE r.order_id = d.order_id
+                     AND r.review_answer_timestamp < dataset.snapshot_date
+               ) order_review
+               WHERE d.customer_unique_id = dataset.customer_unique_id
+                 AND d.order_purchase_timestamp >= dataset.snapshot_date - INTERVAL '180 days'
+                 AND d.order_purchase_timestamp < dataset.snapshot_date
+                 AND d.order_delivered_customer_date < dataset.snapshot_date
+                 AND order_review.order_avg_review_score IS NOT NULL
+           ) expected
+           WHERE dataset.avg_review_score_180d
+                 IS DISTINCT FROM expected.expected_avg_review_score_180d
+          ) AS review_feature_mismatches
     """)
-    print("\nIntegrity checks (both counts should be zero)")
+    print("\nIntegrity checks (all counts should be zero)")
     print(checks.to_string(index=False))
+    assert_zero_integrity_checks(checks.iloc[0].to_dict())
+    print("\nAll churn dataset integrity checks passed.")
 
 
 if __name__ == "__main__":
