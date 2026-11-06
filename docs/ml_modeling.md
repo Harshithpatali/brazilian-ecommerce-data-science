@@ -38,10 +38,11 @@ The holdout report contains:
 
 - Repeat-purchase PR-AUC and ROC-AUC.
 - Prior-prevalence and recency-only baseline PR-AUC.
-- Brier score, log loss, Brier skill score and calibration deciles.
+- Brier score, log loss, Brier skill score, expected calibration error and calibration deciles.
 - Precision, recall, F1, F2, balanced accuracy and Matthews correlation.
 - Precision, recall, lift and flagged share at top 5%, 10% and 20% capacity per month.
-- Customer-cluster bootstrap 95% PR-AUC confidence interval (500 resamples).
+- ROC-AUC, Gini and KS statistic.
+- Customer-cluster bootstrap 95% confidence intervals for PR-AUC (500 resamples) and top-10% campaign precision/recall/lift (200 resamples).
 - Candidate model comparison, split dates, class counts, confusion matrix and prediction-level scores.
 
 The final v5 holdout metrics are intentionally not documented as results until the full database rebuild, validation, training, metadata-contract verification and artifact commit succeed.
