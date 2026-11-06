@@ -240,15 +240,15 @@ def render() -> None:
     pr_curve_path = ROOT / "models" / "test_precision_recall_curve.csv"
     if pr_curve_path.exists():
         pr_curve = pd.read_csv(pr_curve_path)
-        if {"threshold", "precision", "recall"}.issubset(pr_curve.columns) and not pr_curve.empty:
+        if {"repeat_purchase_probability_threshold", "precision", "recall"}.issubset(pr_curve.columns) and not pr_curve.empty:
             section_title(
                 "Final test precision-recall curve",
                 "This curve is generated from the final holdout. Use it to inspect "
-                "the precision/recall trade-off across thresholds.",
+                "the precision/recall trade-off across repeat-purchase probability thresholds.",
             )
-            pr_curve = pr_curve.sort_values("threshold")
+            pr_curve = pr_curve.sort_values("repeat_purchase_probability_threshold")
             st.line_chart(
-                pr_curve.set_index("threshold")[["precision", "recall"]],
+                pr_curve.set_index("repeat_purchase_probability_threshold")[["precision", "recall"]],
                 use_container_width=True,
             )
 
@@ -290,6 +290,8 @@ def render() -> None:
     with st.expander("Evaluation and methodology"):
         st.write(metadata.get("target_definition", ""))
         st.write(metadata.get("evaluation_design", ""))
+        st.write(f"PR-AUC positive class: {metadata.get('evaluation_positive_class', 'not specified')}")
+        st.write(f"Repeat-purchase probability threshold: {metadata.get('repeat_purchase_probability_threshold', 'not available')}")
         st.write(
             "F1-based threshold selection is a technical proxy, not a business-optimal "
             "retention policy until intervention costs and customer value are specified."
