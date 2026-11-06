@@ -44,6 +44,7 @@ EXPECTED_ZERO_CHECKS = (
     "incomplete_label_windows",
     "review_feature_mismatches",
     "invalid_history_feature_rows",
+    "invalid_first_order_profile_rows",
 )
 
 
@@ -164,6 +165,38 @@ def main() -> None:
                  OR orders_prior_180d < 0
                  OR revenue_prior_180d < 0
            ) FROM ml.customer_churn_dataset) AS invalid_history_feature_rows,
+          (SELECT COUNT(*)
+           FROM ml.customer_churn_dataset dataset
+           JOIN ml.first_delivered_orders first_order_key
+             ON first_order_key.customer_unique_id = dataset.customer_unique_id
+           JOIN ml.order_behavior first_order
+             ON first_order.order_id = first_order_key.first_order_id
+           WHERE first_order_key.first_delivery_timestamp >= dataset.snapshot_date
+              OR first_order.order_purchase_timestamp >= dataset.snapshot_date
+              OR first_order.order_delivered_customer_date >= dataset.snapshot_date
+              OR dataset.first_order_item_count <= 0
+              OR dataset.first_order_distinct_products <= 0
+              OR dataset.first_order_distinct_categories <= 0
+              OR dataset.first_order_seller_count <= 0
+              OR dataset.first_order_gross_value <= 0
+              OR dataset.first_order_freight_share < 0
+              OR dataset.first_order_max_installments < 0
+              OR dataset.first_order_payment_type_count < 0
+              OR dataset.first_order_is_credit_card NOT IN (0, 1)
+              OR dataset.first_order_is_boleto NOT IN (0, 1)
+              OR dataset.first_order_is_debit_card NOT IN (0, 1)
+              OR dataset.first_order_is_voucher NOT IN (0, 1)
+              OR dataset.first_order_delivery_days < 0
+              OR dataset.first_order_review_score NOT BETWEEN 1 AND 5
+                 AND dataset.first_order_review_score IS NOT NULL
+              OR dataset.avg_items_per_order_180d <= 0
+              OR dataset.avg_categories_per_order_180d <= 0
+              OR dataset.avg_sellers_per_order_180d <= 0
+              OR dataset.avg_payment_installments_180d < 0
+              OR dataset.credit_card_order_share_180d < 0
+              OR dataset.credit_card_order_share_180d > 1
+              OR dataset.avg_freight_share_180d < 0
+           ) AS invalid_first_order_profile_rows,
           (SELECT COUNT(*)
            FROM ml.customer_churn_dataset dataset
            CROSS JOIN source_end
