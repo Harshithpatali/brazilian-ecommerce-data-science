@@ -74,6 +74,18 @@ The holdout is not used for model or threshold selection.
 
 ## Imbalance and baseline reporting
 
+The database rebuild used for this project produced 10,570 customer-month
+snapshots across 2,374 customers and 21 snapshot months. There were 306
+snapshots with a delivered purchase in the following 90 days (2.89%) and
+10,264 without one (97.11%). These counts describe the full rebuilt dataset,
+not the final test-set distribution.
+
+Because no-purchase is the majority class, model selection and PR-AUC focus on
+the minority repeat-purchase event (`1 - churned`). The fitted model still
+outputs `P(churned)`; repeat-purchase probability is its complement. The
+validation repeat-purchase threshold is converted to a complementary churn
+probability cutoff for the dashboard.
+
 Report class counts and prevalence for each partition, average precision for
 repeat purchase, ROC-AUC, per-class precision/recall/F1, balanced accuracy,
 Matthews correlation coefficient, confusion matrix, classification report,
