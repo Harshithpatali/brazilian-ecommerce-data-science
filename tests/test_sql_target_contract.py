@@ -44,6 +44,9 @@ def test_history_features_are_restricted_to_orders_observable_before_snapshot():
     assert "LAG(d.order_purchase_timestamp)" in sql
     assert "lifetime_delivered_orders" in sql
     assert "median_interpurchase_days" in sql
+    assert "positive_interpurchase_gap_count" in sql
+    assert "zero_interpurchase_gap_share" in sql
+    assert "FILTER (WHERE history.gap_days > 0)" in sql
     assert "orders_prior_180d" in sql
     assert "s.snapshot_date - INTERVAL '360 days'" in sql
     assert "s.snapshot_date - INTERVAL '180 days'" in sql
