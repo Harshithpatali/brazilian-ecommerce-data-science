@@ -13,7 +13,7 @@ import pandas as pd
 from sklearn.base import clone
 from sklearn.compose import ColumnTransformer
 from sklearn.dummy import DummyClassifier
-from sklearn.ensemble import HistGradientBoostingClassifier, RandomForestClassifier
+from sklearn.ensemble import ExtraTreesClassifier, HistGradientBoostingClassifier, RandomForestClassifier
 from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
@@ -268,6 +268,64 @@ def choose_fbeta_threshold(
     }
 
 
+def _optional_boosted_models() -> dict[str, tuple[Any, dict[str, list[Any]]]]:
+    """Add optional tree boosters when installed; keep the core pipeline portable."""
+    numeric = Pipeline([
+        ("imputer", SimpleImputer(strategy="median", add_indicator=True)),
+    ])
+    preprocess = ColumnTransformer([("numeric", numeric, FEATURE_COLS)])
+    candidates: dict[str, tuple[Any, dict[str, list[Any]]]] = {}
+    try:
+        from xgboost import XGBClassifier
+        candidates["xgboost"] = (
+            Pipeline([
+                ("preprocess", preprocess),
+                ("model", XGBClassifier(
+                    n_estimators=250, max_depth=3, learning_rate=0.03,
+                    subsample=0.85, colsample_bytree=0.85,
+                    reg_lambda=5.0, eval_metric="logloss",
+                    random_state=42, n_jobs=1,
+                )),
+            ]),
+            {"model__max_depth": [2, 3], "model__min_child_weight": [5, 15]},
+        )
+    except ImportError:
+        pass
+    try:
+        from catboost import CatBoostClassifier
+        candidates["catboost"] = (
+            Pipeline([
+                ("preprocess", preprocess),
+                ("model", CatBoostClassifier(
+                    iterations=250, depth=4, learning_rate=0.03,
+                    loss_function="Logloss", verbose=False,
+                    random_seed=42, thread_count=1,
+                    auto_class_weights="Balanced",
+                )),
+            ]),
+            {"model__depth": [3, 4]},
+        )
+    except ImportError:
+        pass
+    try:
+        from lightgbm import LGBMClassifier
+        candidates["lightgbm"] = (
+            Pipeline([
+                ("preprocess", preprocess),
+                ("model", LGBMClassifier(
+                    n_estimators=250, learning_rate=0.03,
+                    num_leaves=15, max_depth=4,
+                    class_weight="balanced", random_state=42,
+                    n_jobs=1, verbosity=-1,
+                )),
+            ]),
+            {"model__num_leaves": [7, 15]},
+        )
+    except ImportError:
+        pass
+    return candidates
+
+
 def build_models() -> dict[str, tuple[Any, dict[str, list[Any]]]]:
     numeric = Pipeline([
         ("imputer", SimpleImputer(strategy="median", add_indicator=True)),
@@ -297,6 +355,20 @@ def build_models() -> dict[str, tuple[Any, dict[str, list[Any]]]]:
                 "model__max_leaf_nodes": [15, 31],
                 "model__min_samples_leaf": [100],
                 "model__l2_regularization": [1.0],
+            },
+        ),
+        "extra_trees": (
+            Pipeline([
+                ("preprocess", preprocess),
+                ("model", ExtraTreesClassifier(
+                    n_estimators=250, class_weight="balanced",
+                    random_state=42, n_jobs=1,
+                )),
+            ]),
+            {
+                "model__max_depth": [8, None],
+                "model__min_samples_leaf": [20, 50],
+                "model__max_features": ["sqrt", 0.7],
             },
         ),
         "random_forest": (
@@ -335,7 +407,7 @@ def build_models() -> dict[str, tuple[Any, dict[str, list[Any]]]]:
             ),
             {},
         ),
-    }
+    } | _optional_boosted_models()
 
 
 def _require_both_classes(y: pd.Series, name: str) -> None:
