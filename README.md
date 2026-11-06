@@ -248,7 +248,7 @@ Every script is designed to be **rerunnable against a live database** without ma
 ### Methodology highlights
 
 - **Grain:** one row per customer-month prediction snapshot.
-- **Population:** customers who have reached their second delivered order.
+- **Population:** customers who have reached their second delivered order and have at least one order purchased and delivered in the prior 180 days.
 - **Snapshot logic:** monthly snapshots begin after the customer's second delivered order. A snapshot is included only when the full 90-day forward observation window is present. All eligible snapshots remain in the dataset, allowing customers to reactivate after a period of inactivity.
 - **Target:** `churned = 1` when no eventually-delivered order has a purchase timestamp in the half-open interval `[snapshot_date, snapshot_date + 90 days)`. A purchase exactly at the 90-day boundary is outside the window.
 - **Leakage control:** historical orders must be purchased and delivered before the snapshot; review scores are included only when the review was created before the snapshot. Future orders are used only to create the target. Snapshots without a complete 90-day future window are excluded.
@@ -266,13 +266,14 @@ Two model families are tuned with **expanding-window temporal cross-validation g
 ```mermaid
 flowchart LR
     A["Point-in-time<br/>churn dataset"] --> B["Chronological split<br/>train / validation / test"]
-    B --> C["Randomized hyperparameter search<br/>+ expanding-window CV"]
+    B --> C["Date-grouped expanding-window CV<br/>+ GridSearchCV"]
     C --> D1[Logistic Regression]
     C --> D3[HistGradientBoosting]
-    D1 --> E["Compare on PR-AUC<br/>(+ ROC-AUC, F1)"]
+    D1 --> E["Select using mean CV PR-AUC"]
     D3 --> E
-    E --> F["Select best pipeline"]
-    F --> G[("models/best_churn_model.joblib")]
+    E --> V["Choose threshold on validation<br/>by maximum F1"]
+    V --> T["Evaluate frozen model once<br/>on final chronological test"]
+    T --> G[("models/best_churn_model.joblib")]
     C -.logged to.-> M[("MLflow<br/>Tracking Server")]
 
     style A fill:#4c72b0,color:#fff
@@ -282,7 +283,7 @@ flowchart LR
 
 The performance-optimized build first materializes delivered orders into a compact `ml.delivered_orders` table, aggregates to `ml.customer_monthly_activity`, and only then constructs the point-in-time dataset — avoiding an expensive snapshot × full-order-history join and reducing the risk of Supabase statement timeouts on large SQL builds.
 
-All experiment runs, hyperparameters, and metrics are tracked with **MLflow**. The selected best pipeline is persisted to `models/best_churn_model.joblib` and loaded directly by Streamlit — no separate model-serving API is required.
+Temporal-CV runs, hyperparameters and final selected-model evaluation are tracked with **MLflow**. The selected pipeline is persisted to `models/best_churn_model.joblib` and loaded directly by Streamlit — no separate model-serving API is required. Model selection uses cross-validation PR-AUC; validation selects the F1 threshold; the final test period is evaluated once.
 
 See [`docs/churn_methodology.md`](docs/churn_methodology.md), [`docs/ml_modeling.md`](docs/ml_modeling.md), and [`docs/model_card.md`](docs/model_card.md) for full details, including known limitations.
 
