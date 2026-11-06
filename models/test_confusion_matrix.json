@@ -1,17 +1,17 @@
 {
   "labels": [
-    "purchase_within_90_days",
-    "churned"
+    "second_purchase_within_90_days",
+    "no_purchase_within_90_days"
   ],
   "matrix": [
     [
-      73,
-      39
+      42,
+      840
     ],
     [
-      1942,
-      2566
+      1190,
+      141136
     ]
   ],
-  "threshold": 0.9990765283209141
+  "threshold": 0.9876843024449382
 }
