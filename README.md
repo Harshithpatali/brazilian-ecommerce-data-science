@@ -282,10 +282,11 @@ The selected model is calibrated with a Platt sigmoid fitted only on the separat
 The v5 evaluation records:
 
 - PR-AUC and ROC-AUC, compared with both a training-prevalence baseline and a simple recency-only ranking.
-- Brier score, log loss, Brier skill score and a holdout probability-calibration table.
+- Brier score, log loss, Brier skill score, expected calibration error and a holdout probability-calibration table.
+- Gini and Kolmogorov–Smirnov (KS) discrimination measures.
 - Precision, recall, F1, F2, balanced accuracy, Matthews correlation and a confusion matrix.
 - Precision, recall, lift and contacted share at **top 5%, 10% and 20% campaign capacity per month**.
-- A 95% customer-cluster bootstrap confidence interval for PR-AUC using 500 resamples, so repeated monthly rows from the same customer are not treated as independent observations.
+- 95% customer-cluster bootstrap confidence intervals for PR-AUC (500 resamples) and top-10% campaign precision/recall/lift (200 resamples), so repeated monthly rows from one customer are not treated as independent observations.
 - Candidate model parameters, split dates, class distributions, feature availability and fitted-model SHA-256 in the artifact metadata.
 
 The operational policy is capacity-based: rank customers within each month and select the highest-propensity customers up to the campaign's contact limit. This is more useful than lowering a global threshold until the model flags most customers.
