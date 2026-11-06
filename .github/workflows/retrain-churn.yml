@@ -10,7 +10,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: churn-rebuild-\${{ github.ref }}
+  group: churn-rebuild-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -18,12 +18,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     env:
-      DATABASE_URL: \${{ secrets.DATABASE_URL }}
-      SUPABASE_DB_HOST: \${{ secrets.SUPABASE_DB_HOST }}
-      SUPABASE_DB_PORT: \${{ secrets.SUPABASE_DB_PORT }}
-      SUPABASE_DB_NAME: \${{ secrets.SUPABASE_DB_NAME }}
-      SUPABASE_DB_USER: \${{ secrets.SUPABASE_DB_USER }}
-      SUPABASE_DB_PASSWORD: \${{ secrets.SUPABASE_DB_PASSWORD }}
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      SUPABASE_DB_HOST: ${{ secrets.SUPABASE_DB_HOST }}
+      SUPABASE_DB_PORT: ${{ secrets.SUPABASE_DB_PORT }}
+      SUPABASE_DB_NAME: ${{ secrets.SUPABASE_DB_NAME }}
+      SUPABASE_DB_USER: ${{ secrets.SUPABASE_DB_USER }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
       DB_CONNECT_TIMEOUT: "20"
       MLFLOW_EXPERIMENT_NAME: brazilian-ecommerce-churn-v3
     steps:
@@ -53,10 +53,10 @@ jobs:
           if [[ -z "$DATABASE_URL" ]]; then
             required=(SUPABASE_DB_HOST SUPABASE_DB_USER SUPABASE_DB_PASSWORD)
             missing=()
-            for name in "\${required[@]}"; do
-              if [[ -z "\${!name}" ]]; then missing+=("$name"); fi
+            for name in "${required[@]}"; do
+              if [[ -z "${!name}" ]]; then missing+=("$name"); fi
             done
-            if (( \${#missing[@]} > 0 )); then
+            if (( ${#missing[@]} > 0 )); then
               echo "::error::Missing GitHub Actions secrets. Configure DATABASE_URL, or configure all of SUPABASE_DB_HOST, SUPABASE_DB_USER, and SUPABASE_DB_PASSWORD in repository Settings > Secrets and variables > Actions."
               exit 1
             fi
