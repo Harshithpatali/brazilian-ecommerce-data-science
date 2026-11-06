@@ -31,6 +31,18 @@ Future observations are used only to construct the target.
 
 ## Models and evaluation
 
+The rebuilt dataset contains 306 repeat-purchase snapshots out of 10,570
+(2.89%); 97.11% have no delivered purchase in the next 90 days. Because the
+no-purchase class is the majority, model family and hyperparameters are
+selected by expanding-window temporal CV average precision for the minority
+repeat-purchase event (`churned = 0`). The model itself outputs churn
+probability; repeat-purchase probability is its complement. The repeat-
+purchase threshold is selected on a separate validation period by maximum
+F1 and converted to the complementary churn-probability cutoff for the
+risk-scoring dashboard.
+
+
+
 Candidate models are Logistic Regression and HistGradientBoosting. Model family
 and hyperparameters are selected with expanding-window temporal CV grouped by
 unique snapshot dates. The threshold is selected on a separate validation
