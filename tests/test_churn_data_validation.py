@@ -35,3 +35,12 @@ def test_v5_requires_categorical_feature_integrity_check():
     checks["invalid_categorical_feature_rows"] = 1
     with pytest.raises(SystemExit, match="invalid_categorical_feature_rows"):
         assert_zero_integrity_checks(checks)
+
+
+
+def test_v5_requires_as_of_customer_state_integrity_check():
+    assert "customer_state_mismatches" in EXPECTED_ZERO_CHECKS
+    checks = zero_checks()
+    checks["customer_state_mismatches"] = 1
+    with pytest.raises(SystemExit, match="customer_state_mismatches"):
+        assert_zero_integrity_checks(checks)
