@@ -54,6 +54,10 @@ def valid_metadata():
             "recency_baseline_pr_auc": 0.52,
             "frequency_baseline_pr_auc": 0.55,
             "lifetime_frequency_baseline_pr_auc": 0.57,
+            "prior_dummy_brier_score": 0.22,
+            "prior_dummy_log_loss": 0.61,
+            "mean_predicted_repeat_probability": 0.34,
+            "predicted_to_observed_rate_ratio": 0.93,
         },
         "test_capacity_metrics": {
             "5%": {"precision": 0.60, "recall": 0.10, "lift_over_monthly_prevalence": 1.6},
@@ -72,6 +76,7 @@ def valid_metadata():
             "lower_95": 0.58, "upper_95": 0.68, "valid_replicates": 200
         },
         "unseen_customer_test_metrics": {"rows": 100, "customers": 80},
+        "known_customer_test_metrics": {"rows": 50, "customers": 30},
         "dummy_baseline": {
             "strategy": "prior",
             "test_pr_auc": 0.36363636363636365,
@@ -212,3 +217,10 @@ def test_model_contract_rejects_first_order_profile_leakage():
         "all customer orders including future orders"
     )
     assert any("first_order_profile" in error for error in validate_model_metadata(metadata))
+
+
+
+def test_model_contract_requires_known_customer_test_subset():
+    metadata = valid_metadata()
+    metadata.pop("known_customer_test_metrics")
+    assert any("known_customer_test_metrics" in error for error in validate_model_metadata(metadata))
