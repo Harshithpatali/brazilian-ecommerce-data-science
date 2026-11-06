@@ -49,7 +49,22 @@ def test_ml_feature_contract_includes_first_order_and_payment_behaviour():
 
 
 def test_ml_feature_contract_is_unique_and_contains_all_expected_features():
-    assert len(FEATURE_COLS) == 49
+    assert len(FEATURE_COLS) == 57
     assert len(FEATURE_COLS) == len(set(FEATURE_COLS))
     assert "revenue_prior_180d" in FEATURE_COLS
     assert "avg_review_score_180d" in FEATURE_COLS
+
+
+def test_ml_feature_contract_includes_basket_category_seller_and_payment_mix():
+    expected = {
+        "avg_distinct_products_per_order_180d",
+        "avg_product_diversity_share_180d",
+        "category_preference_entropy_180d",
+        "dominant_category_share_180d",
+        "seller_concentration_hhi_180d",
+        "top_seller_share_180d",
+        "payment_type_diversity_180d",
+        "installment_order_share_180d",
+    }
+    assert expected <= set(FEATURE_COLS)
+    assert len(FEATURE_COLS) == len(set(FEATURE_COLS))
