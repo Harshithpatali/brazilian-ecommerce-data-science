@@ -117,6 +117,8 @@ jobs:
             models/best_churn_model.joblib \
             models/model_metadata.json \
             models/model_comparison.csv \
+            models/test_predictions.parquet \
+            models/test_classification_report.json \
             models/test_confusion_matrix.json \
             models/test_precision_recall_curve.csv
           if git diff --cached --quiet; then
