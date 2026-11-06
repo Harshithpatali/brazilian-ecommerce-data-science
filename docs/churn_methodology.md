@@ -1,111 +1,79 @@
-# Churn Modeling Methodology
+# Repeat-Purchase Propensity Methodology — v5
 
 ## Prediction question
 
-At the beginning of a monthly snapshot, among customers with at least two
-previously delivered orders and delivered activity in the prior 180 days, will
-the customer place no order that is eventually delivered during the next 90 days?
+At each monthly scoring date, among customers with at least one delivered order in the prior 180 days, which customers are most likely to place another order that is eventually delivered during the next 90 days?
 
-This is a forward-looking 90-day inactivity label, not permanent customer loss.
+This is a recurring CRM propensity-ranking problem. The population includes customers after their first delivered order; customers do not need to have repeated before becoming eligible.
 
 ## Snapshot and eligible population
 
-- Customers enter after their second delivered order has reached the customer.
-- The first snapshot is the first day of the following calendar month.
-- A snapshot is retained only when the customer has at least one order both
-  purchased and delivered during the exact prior 180-day feature window.
-- Monthly snapshots continue after earlier inactivity labels, allowing
-  customers to reactivate.
-- A snapshot is eligible only when the source contains a complete 90-day
-  forward observation window.
+- **Snapshot grain:** one row per customer per calendar month.
+- **Entry:** the first snapshot is the first day of the month after the customer's first delivered order.
+- **Eligibility:** the customer must have at least one order both purchased and delivered during the exact prior 180-day feature window.
+- **Repeat snapshots:** customers can reappear in later months, including after a period without a purchase. Each row is a new decision moment.
+- **Observation end:** a snapshot is materialized only if the complete next-90-day label window is observable.
+- **Customer identity:** \`customer_unique_id\` is used for longitudinal customer grouping, not the per-order \`customer_id\`.
+
+A read-only Supabase preflight estimated 357,413 customer-month decisions across 79,594 customers and 2,686 repeat-purchase decision rows (0.75%). These are preflight counts, not the final v5 materialized dataset or final holdout counts.
 
 ## Target definition
 
-The SQL target uses the half-open interval
-[snapshot_date, snapshot_date + 90 days).
+The target uses the half-open interval [snapshot_date, snapshot_date + 90 days).
 
-- churned = 1 when no eventually-delivered order has a purchase timestamp in
-  this interval.
-- churned = 0 when at least one eventually-delivered order was purchased in it.
+- \`churned = 0\` when at least one eventually-delivered order has a purchase timestamp in this interval.
+- \`churned = 1\` when no such order exists.
 - A purchase exactly at the 90-day upper boundary is outside the interval.
-- Observation end is based on the latest purchase timestamp across all source
-  orders, not only delivered orders.
+- Eventual delivery status is used retrospectively to define the outcome; it is never a predictor.
+- In model evaluation, repeat purchase (\`1 - churned\`) is the positive class.
 
-Future records create the label only; they are never used as predictors.
+The next-90-day label window must be complete before a snapshot is included.
 
 ## Point-in-time features
 
-For snapshot date t, historical order features use purchase timestamps in
-[t - 180 days, t) and require delivery to have occurred before t. The 90-day
-and 30-day order/revenue counts are nested windows within the 180-day window.
+For snapshot date t, current activity features use delivered orders purchased in [t - 180 days, t) and delivered before t. Nested order and revenue windows cover the latest 90 and 30 days. A prior period [t - 360 days, t - 180 days) supports activity-trend ratios.
 
-Other features include average order value, average delivery delay, active
-purchase months, recency, order/revenue shares, and order-value ratios. The
-prior 180-day window ([t - 360 days, t - 180 days)) measures changes in order
-frequency and revenue. Lifetime features include the delivered-order count,
-customer tenure, and average/median positive interpurchase gaps with gap variability. Orders with an identical purchase timestamp are represented by a zero-gap share instead of forcing undefined gap statistics to zero; undefined positive-gap ratios are imputed during model fitting.
-All lifetime history is restricted to purchases and deliveries completed
-before t. Review scores are included only when the review-answer timestamp
-precedes t, because the score is not observable until the customer submits it.
+Lifetime features include delivered-order count, customer tenure, positive interpurchase-gap count, zero-gap share, positive-gap mean/median and gap variability. If orders share an exact purchase timestamp, that is represented as a zero-gap event; no artificial positive interval is added.
+
+Customer state is taken from the **most recently purchased delivered order observable before t**. Snapshot month is derived from t. Review scores enter only when the review-answer timestamp precedes t. Undefined numerical features remain missing and are imputed inside each fitted pipeline, not by using information from a later snapshot.
+
+All feature SQL is constrained by purchase and delivery timestamps earlier than t. Future records are used only to construct the label.
 
 ## Temporal evaluation protocol
 
-Unique snapshot dates are split chronologically into a training period, a separate
-validation period, and the latest 20% final test period. A 90-day embargo is
-applied at each boundary: a training snapshot is retained only when its full
-90-day label window ends on or before the first validation date, and a
-validation snapshot is retained only when its label window ends on or before
-the first final-test date. Dates in the embargo gaps are deliberately excluded.
+Unique snapshot dates are split chronologically into training, a separate validation period and a final test period. A 90-day embargo is applied at each boundary because the target looks 90 days into the future. Training snapshots are retained only when their target window ends by the first validation date. Validation snapshots are retained only when their target window ends by the first test date.
 
-Expanding-window CV folds are created from unique snapshot dates, not rows.
-All customers from one snapshot date are assigned to the same fold side. Each
-fold also purges training snapshots whose 90-day target windows overlap the
-validation block.
-Customers may occur in earlier and later periods; this measures future
-predictions for known customers, matching the intended use case.
+Expanding-window CV folds are formed from unique snapshot dates, never individual rows. All customers from one snapshot month remain on the same side of a fold. Each fold purges training snapshots whose 90-day label windows overlap the validation block. The v5 training search requires at least 15 repeat-purchase and 15 non-repeat-purchase examples in each fit and validation block. When the available history cannot support this, training fails instead of silently using a random split or a near-empty positive fold.
 
-The candidate model is selected by mean CV average precision (PR-AUC) for the
-minority event: a delivered purchase within 90 days (SQL `churned = 0`). This
-avoids optimizing PR-AUC for the 97% majority no-purchase class. The threshold
-is selected by maximizing F2 (beta=2) for repeat purchase on the separate
-validation period. This deliberately weights recall more heavily than
-precision; the equivalent complementary churn-probability cutoff is stored
-for risk scoring. Since no business cost matrix is supplied, F2 remains a
-technical proxy rather than a proven profit-maximizing intervention threshold.
+Customers may occur in both earlier and later time periods. This is intentional for the use case of monthly scoring of known customers. It does **not** measure generalization to entirely new customers. Confidence intervals use customer-cluster bootstrap resampling so repeated monthly rows for one customer are not treated as independent observations.
 
-The frozen model and threshold are evaluated once on the final chronological
-holdout. A 90-day embargo separates validation labels from final-test snapshots.
-The holdout is not used for model or threshold selection.
+## Model selection and calibration
 
-## Imbalance and baseline reporting
+Candidate families are Logistic Regression, HistGradientBoosting, Random Forest and CatBoost. The first three use a train-fitted numeric/categorical preprocessing pipeline; CatBoost receives customer state and snapshot month as native categorical features.
 
-The database rebuild used for this project produced 10,570 customer-month
-snapshots across 2,374 customers and 21 snapshot months. There were 306
-snapshots with a delivered purchase in the following 90 days (2.89%) and
-10,264 without one (97.11%). These counts describe the full rebuilt dataset,
-not the final test-set distribution.
+The winning candidate is selected using mean purged temporal-CV average precision for repeat purchase. A Platt sigmoid is then fitted on the separate chronological validation period to calibrate repeat-purchase probabilities. The final test period is not used for candidate selection, calibration or capacity-policy selection.
 
-Because no-purchase is the majority class, model selection and PR-AUC focus on
-the minority repeat-purchase event (`1 - churned`). The fitted model still
-outputs `P(churned)`; repeat-purchase probability is its complement. The
-validation repeat-purchase threshold is converted to a complementary churn
-probability cutoff for the dashboard.
+## Operational policy and reporting
 
-Report class counts and prevalence for each partition, average precision for
-repeat purchase, ROC-AUC, per-class precision/recall/F1, balanced accuracy,
-Matthews correlation coefficient, confusion matrix, classification report,
-and a DummyClassifier prior-probability average-precision baseline. Compare
-repeat-purchase PR-AUC with its prevalence baseline, not with the majority
-churn prevalence.
+The operational decision is capacity-based, not a global probability cutoff. For each monthly snapshot, customers are ranked by calibrated repeat-purchase probability and the top 5%, 10% or 20% are selected for an illustrative campaign list.
 
-Interpret average precision relative to positive-class prevalence. A high
-PR-AUC alone is not evidence of useful discrimination when positives are common.
+The final holdout reports:
 
-## Limitations
+- PR-AUC and ROC-AUC for repeat purchase.
+- A training-prevalence prior baseline and a recency-only ranking baseline.
+- Brier score, log loss, Brier skill score and probability-calibration deciles.
+- Precision, recall, F1, F2, balanced accuracy and Matthews correlation under the capacity policy.
+- Precision, recall, lift and contacted share at top 5%, 10% and 20% monthly capacity.
+- A 95% customer-cluster bootstrap interval for PR-AUC.
+- Class distributions, split dates, model comparison, holdout predictions and confusion matrix.
 
-- Evaluation allows customers in earlier training periods to appear in later
-  periods. It is not unseen-customer generalization.
-- Final delivery status is used retrospectively to define delivered events;
-  predictors are restricted to information observable at snapshot time.
-- F2-based threshold selection does not encode intervention economics or the cost of false positives.
-- Olist is a historical dataset, not a live marketplace feed.
+PR-AUC must be interpreted relative to repeat-purchase prevalence. A ranking model should also be compared with the simple recency baseline; beating a constant prior alone is not enough evidence of useful customer ranking.
+
+## Limitations and production requirements
+
+- Olist is a historical dataset, not a live customer-event feed.
+- Eventual delivery is part of the retrospective label definition.
+- Historical performance on known customers does not establish performance on newly acquired customers.
+- A propensity model predicts who is likely to purchase; it does not estimate who will purchase **because** they receive an offer.
+- Before operational deployment, evaluate incremental effect using randomized campaign holdouts or an uplift design, and include contact cost, incentive cost, margin and campaign capacity.
+- Offline ranking and calibration metrics are not a substitute for live monitoring, data-drift checks, calibration refresh, rollback and privacy/consent controls.
