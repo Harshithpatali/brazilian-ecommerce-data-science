@@ -721,6 +721,35 @@ def main() -> None:
     selected_search = searches[selected_name]
     selected_model = selected_search.best_estimator_
 
+    # Global model explanations are descriptive, not causal. Tree importances
+    # are exported only when the selected estimator exposes them.
+    importance_rows: list[dict[str, Any]] = []
+    fitted_pipeline = selected_model
+    fitted_estimator = (
+        fitted_pipeline.named_steps.get("model")
+        if hasattr(fitted_pipeline, "named_steps") else None
+    )
+    importances = getattr(fitted_estimator, "feature_importances_", None)
+    if importances is not None and len(importances) == len(FEATURE_COLS):
+        importance_rows = [
+            {"feature": feature, "importance": float(value)}
+            for feature, value in zip(FEATURE_COLS, importances)
+        ]
+    elif hasattr(fitted_estimator, "coef_"):
+        coefficients = np.asarray(fitted_estimator.coef_).reshape(-1)
+        if len(coefficients) == len(FEATURE_COLS):
+            importance_rows = [
+                {"feature": feature, "importance": float(abs(value))}
+                for feature, value in zip(FEATURE_COLS, coefficients)
+            ]
+    feature_importance = pd.DataFrame(importance_rows)
+    if not feature_importance.empty:
+        feature_importance = feature_importance.sort_values(
+            "importance", ascending=False
+        )
+    feature_importance_path = MODEL_DIR / "feature_importance.csv"
+    feature_importance.to_csv(feature_importance_path, index=False)
+
     # The sigmoid calibrator is trained on purged OOF predictions from training
     # rows only. Validation selects the operating threshold; test stays untouched.
     calibrator, calibration_rows = _fit_oof_platt_calibrator(
@@ -1062,6 +1091,7 @@ def main() -> None:
         "artifacts": {
             "model": "models/best_churn_model.joblib",
             "comparison": "models/model_comparison.csv",
+            "feature_importance": "models/feature_importance.csv",
             "test_predictions": "models/test_predictions.parquet",
             "classification_report": "models/test_classification_report.json",
             "confusion_matrix": "models/test_confusion_matrix.json",
@@ -1101,6 +1131,7 @@ def main() -> None:
         mlflow.log_metric("customer_cluster_pr_auc_ci95_upper", cluster_bootstrap_ci["upper_95"])
         for artifact, folder in [
             (comparison_path, "model_selection"),
+            (feature_importance_path, "model_selection"),
             (metadata_path, "model_selection"),
             (report_path, "evaluation"),
             (matrix_path, "evaluation"),
@@ -1121,6 +1152,7 @@ def main() -> None:
     print("CV model comparison (PR-AUC for second purchase within 90 days):")
     print(comparison.to_string(index=False))
     print("Selected model:", selected_name)
+    print("Feature importance:", feature_importance.head(20).to_dict(orient="records"))
     print("Validation-selected threshold objective: F2 (beta=2.0)")
     print("Validation-selected churn probability threshold:", threshold)
     print("Validation-selected repeat-purchase probability threshold:", repeat_threshold)
