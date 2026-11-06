@@ -123,6 +123,68 @@ def render() -> None:
     prevalence = baseline.get("test_positive_prevalence")
     if prevalence is not None:
         st.caption(f"Test positive prevalence: {float(prevalence):.1%}. Interpret PR-AUC relative to this baseline.")
+    if test_metrics.get("pr_auc_lift_over_dummy") is not None:
+        st.caption(
+            f"PR-AUC lift over the prior-probability baseline: "
+            f"{float(test_metrics['pr_auc_lift_over_dummy']):+.4f}"
+        )
+
+    section_title(
+        "Class balance by partition",
+        "Counts are shown separately for train, validation and final test. "
+        "Class 1 is the 90-day churn label.",
+    )
+    distribution = metadata.get("class_distribution", {})
+    distribution_rows = []
+    for partition in ["train", "validation", "test"]:
+        counts = distribution.get(partition, {})
+        class_0 = int(counts.get("0", 0))
+        class_1 = int(counts.get("1", 0))
+        total = class_0 + class_1
+        distribution_rows.append({
+            "Partition": partition.title(),
+            "Purchase within 90 days (0)": class_0,
+            "No delivered purchase (1)": class_1,
+            "Churn prevalence": class_1 / total if total else None,
+        })
+    st.dataframe(
+        pd.DataFrame(distribution_rows),
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    confusion_path = ROOT / "models" / "test_confusion_matrix.json"
+    if confusion_path.exists():
+        confusion = json.loads(confusion_path.read_text(encoding="utf-8"))
+        matrix = confusion.get("matrix", [])
+        labels = confusion.get("labels", ["purchase_within_90_days", "churned"])
+        if len(matrix) == 2 and all(len(row) == 2 for row in matrix):
+            section_title(
+                "Final test confusion matrix",
+                "Rows are actual classes and columns are predicted classes, "
+                f"at threshold {float(confusion.get('threshold', threshold)):.3f}.",
+            )
+            confusion_frame = pd.DataFrame(
+                matrix,
+                index=[f"Actual: {label}" for label in labels],
+                columns=[f"Predicted: {label}" for label in labels],
+            )
+            st.dataframe(confusion_frame, use_container_width=True)
+
+    pr_curve_path = ROOT / "models" / "test_precision_recall_curve.csv"
+    if pr_curve_path.exists():
+        pr_curve = pd.read_csv(pr_curve_path)
+        if {"threshold", "precision", "recall"}.issubset(pr_curve.columns) and not pr_curve.empty:
+            section_title(
+                "Final test precision-recall curve",
+                "This curve is generated from the final holdout. Use it to inspect "
+                "the precision/recall trade-off across thresholds.",
+            )
+            pr_curve = pr_curve.sort_values("threshold")
+            st.line_chart(
+                pr_curve.set_index("threshold")[["precision", "recall"]],
+                use_container_width=True,
+            )
 
     comparison = load_comparison()
     section_title(
