@@ -19,7 +19,6 @@ def valid_metadata():
         "balanced_accuracy": 0.55,
         "matthews_corrcoef": 0.12,
         "positive_prevalence": 0.03,
-        "threshold": 0.96,
         "dummy_baseline_pr_auc": 0.03,
         "pr_auc_lift_over_dummy": 0.07,
         "recency_only_pr_auc": 0.08,
@@ -122,10 +121,9 @@ def test_feature_order_or_schema_mismatch_is_rejected():
     assert any("feature_columns" in error for error in validate_model_metadata(metadata))
 
 
-def test_invalid_threshold_is_rejected():
+def test_invalid_reference_threshold_is_rejected():
     metadata = valid_metadata()
     metadata["threshold"] = 1.5
-    metadata["test_metrics"]["threshold"] = 1.5
     assert any("threshold" in error for error in validate_model_metadata(metadata))
 
 
@@ -188,3 +186,8 @@ def test_customer_bootstrap_interval_must_be_valid():
     metadata = valid_metadata()
     metadata["customer_bootstrap_pr_auc_95_ci"]["lower_95"] = 0.20
     assert any("customer-bootstrap PR-AUC interval" in error for error in validate_model_metadata(metadata))
+
+
+
+def test_capacity_policy_holdout_metrics_do_not_claim_one_global_test_threshold():
+    assert "threshold" not in valid_metadata()["test_metrics"]
