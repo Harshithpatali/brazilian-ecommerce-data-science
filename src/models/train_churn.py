@@ -12,12 +12,12 @@ import numpy as np
 import pandas as pd
 from sklearn.compose import ColumnTransformer
 from sklearn.dummy import DummyClassifier
-from sklearn.ensemble import HistGradientBoostingClassifier
+from sklearn.ensemble import HistGradientBoostingClassifier, RandomForestClassifier
 from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
     average_precision_score, classification_report, confusion_matrix,
-    balanced_accuracy_score, f1_score, matthews_corrcoef, precision_recall_curve,
+    balanced_accuracy_score, f1_score, fbeta_score, matthews_corrcoef, precision_recall_curve,
     precision_score, recall_score, roc_auc_score,
 )
 from sklearn.model_selection import GridSearchCV, TimeSeriesSplit
@@ -206,15 +206,20 @@ def repeat_purchase_average_precision_scorer(
     return float(average_precision_score(repeat_target, repeat_probability))
 
 
-def choose_f1_threshold(
+def choose_fbeta_threshold(
     y_churned: pd.Series | np.ndarray,
     churn_probabilities: np.ndarray,
+    beta: float = 2.0,
 ) -> tuple[float, dict[str, float]]:
     """
-    Choose the threshold on validation data by maximizing F1 for repeat purchase.
+    Select a recall-oriented repeat-purchase threshold using validation F-beta.
 
-    Returns the equivalent churn-probability cutoff for dashboard risk scoring.
+    F2 weights recall more heavily than precision. The returned threshold is
+    the complementary churn-probability cutoff used by the Streamlit risk UI.
     """
+    if not np.isfinite(beta) or beta <= 0:
+        raise ValueError("beta must be a finite positive number.")
+
     repeat_target = 1 - np.asarray(y_churned, dtype=int)
     repeat_probabilities = 1.0 - np.asarray(churn_probabilities, dtype=float)
     precision, recall, thresholds = precision_recall_curve(
@@ -223,23 +228,24 @@ def choose_f1_threshold(
     if not len(thresholds):
         repeat_threshold = 0.5
     else:
-        denominator = precision[:-1] + recall[:-1]
-        f1_values = np.divide(
-            2 * precision[:-1] * recall[:-1],
+        beta_squared = beta ** 2
+        denominator = beta_squared * precision[:-1] + recall[:-1]
+        fbeta_values = np.divide(
+            (1 + beta_squared) * precision[:-1] * recall[:-1],
             denominator,
             out=np.zeros_like(denominator),
             where=denominator > 0,
         )
-        repeat_threshold = float(thresholds[int(np.nanargmax(f1_values))])
+        repeat_threshold = float(thresholds[int(np.nanargmax(fbeta_values))])
 
     predicted_repeat = (repeat_probabilities >= repeat_threshold).astype(int)
-    # Translate the repeat-purchase threshold to a churn-probability threshold.
-    # nextafter preserves the complementary decision at exact ties.
     churn_threshold = min(1.0, float(np.nextafter(1.0 - repeat_threshold, np.inf)))
     return churn_threshold, {
         "precision": float(precision_score(repeat_target, predicted_repeat, zero_division=0)),
         "recall": float(recall_score(repeat_target, predicted_repeat, zero_division=0)),
         "f1": float(f1_score(repeat_target, predicted_repeat, zero_division=0)),
+        "f2": float(fbeta_score(repeat_target, predicted_repeat, beta=2.0, zero_division=0)),
+        "beta": float(beta),
         "repeat_purchase_probability_threshold": repeat_threshold,
     }
 
@@ -273,6 +279,22 @@ def build_models() -> dict[str, tuple[Pipeline, dict[str, list[Any]]]]:
                 "model__max_leaf_nodes": [15, 31],
                 "model__min_samples_leaf": [20, 50],
                 "model__l2_regularization": [0.0, 1.0],
+            },
+        ),
+        "random_forest": (
+            Pipeline([
+                ("preprocess", preprocess),
+                ("model", RandomForestClassifier(
+                    n_estimators=300,
+                    class_weight="balanced_subsample",
+                    random_state=42,
+                    n_jobs=1,
+                )),
+            ]),
+            {
+                "model__max_depth": [3, 5, None],
+                "model__min_samples_leaf": [2, 5, 10],
+                "model__max_features": ["sqrt", 0.8],
             },
         ),
     }
@@ -368,8 +390,8 @@ def main() -> None:
 
     # Validation selects the threshold; the final chronological test stays untouched.
     validation_prob = selected_model.predict_proba(X_validation)[:, 1]
-    threshold, validation_threshold_metrics = choose_f1_threshold(
-        y_validation, validation_prob
+    threshold, validation_threshold_metrics = choose_fbeta_threshold(
+        y_validation, validation_prob, beta=2.0
     )
     test_prob = selected_model.predict_proba(X_test)[:, 1]
     test_repeat_prob = 1.0 - test_prob
@@ -387,6 +409,7 @@ def main() -> None:
         "precision": float(precision_score(y_test_repeat, test_pred_repeat, zero_division=0)),
         "recall": float(recall_score(y_test_repeat, test_pred_repeat, zero_division=0)),
         "f1": float(f1_score(y_test_repeat, test_pred_repeat, zero_division=0)),
+        "f2": float(fbeta_score(y_test_repeat, test_pred_repeat, beta=2.0, zero_division=0)),
         "class_0_precision": float(precision_score(y_test, test_pred, pos_label=0, zero_division=0)),
         "class_0_recall": float(recall_score(y_test, test_pred, pos_label=0, zero_division=0)),
         "class_0_f1": float(f1_score(y_test, test_pred, pos_label=0, zero_division=0)),
@@ -451,9 +474,12 @@ def main() -> None:
         "tracking_uri": get_tracking_uri(),
         "selected_model": selected_name,
         "selection_metric": "cv_average_precision_for_purchase_within_90_days",
+        "threshold_objective": "F2",
+        "threshold_beta": 2.0,
         "best_params": selected_search.best_params_,
         "threshold": threshold,
-        "threshold_selection": "maximum F1 for purchase_within_90_days on separate validation period",
+        "threshold_selection": "maximum F2 for purchase_within_90_days on separate validation period",
+        "threshold_beta": 2.0,
         "repeat_purchase_probability_threshold": repeat_threshold,
         "evaluation_positive_class": "purchase_within_90_days (SQL churned=0)",
         "threshold_validation_metrics": validation_threshold_metrics,
@@ -512,7 +538,8 @@ def main() -> None:
             "selection_metric": "cv_average_precision_for_purchase_within_90_days",
             "model_version": MODEL_VERSION,
             "threshold": threshold,
-            "threshold_selection": "maximum validation F1 for purchase_within_90_days",
+            "threshold_selection": "maximum validation F2 for purchase_within_90_days",
+            "threshold_beta": 2.0,
             "test_start": periods["test_start"],
             "test_end": periods["test_end"],
         })
@@ -522,6 +549,7 @@ def main() -> None:
             if isinstance(value, (float, int)) and np.isfinite(value)
         })
         mlflow.log_metric("validation_repeat_purchase_f1", validation_threshold_metrics["f1"])
+        mlflow.log_metric("validation_repeat_purchase_f2", validation_threshold_metrics["f2"])
         for artifact, folder in [
             (comparison_path, "model_selection"),
             (metadata_path, "model_selection"),
@@ -541,6 +569,7 @@ def main() -> None:
     print("CV model comparison (PR-AUC for purchase within 90 days):")
     print(comparison.to_string(index=False))
     print("Selected model:", selected_name)
+    print("Validation-selected threshold objective: F2 (beta=2.0)")
     print("Validation-selected churn probability threshold:", threshold)
     print("Validation-selected repeat-purchase probability threshold:", repeat_threshold)
     print("Final untouched test metrics (positive class = purchase within 90 days):", json.dumps(test_metrics, indent=2))
