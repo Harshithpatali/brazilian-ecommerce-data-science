@@ -730,17 +730,24 @@ def main() -> None:
         if hasattr(fitted_pipeline, "named_steps") else None
     )
     importances = getattr(fitted_estimator, "feature_importances_", None)
-    if importances is not None and len(importances) == len(FEATURE_COLS):
-        importance_rows = [
-            {"feature": feature, "importance": float(value)}
-            for feature, value in zip(FEATURE_COLS, importances)
-        ]
-    elif hasattr(fitted_estimator, "coef_"):
-        coefficients = np.asarray(fitted_estimator.coef_).reshape(-1)
-        if len(coefficients) == len(FEATURE_COLS):
+    coefficients = (
+        np.abs(np.asarray(fitted_estimator.coef_)).reshape(-1)
+        if hasattr(fitted_estimator, "coef_") else None
+    )
+    values = importances if importances is not None else coefficients
+    if values is not None:
+        try:
+            transformed_names = selected_model.named_steps["preprocess"].get_feature_names_out()
+            names = [
+                str(name).replace("numeric__", "")
+                for name in transformed_names
+            ]
+        except (AttributeError, KeyError, ValueError):
+            names = list(FEATURE_COLS)
+        if len(values) == len(names):
             importance_rows = [
-                {"feature": feature, "importance": float(abs(value))}
-                for feature, value in zip(FEATURE_COLS, coefficients)
+                {"feature": feature, "importance": float(value)}
+                for feature, value in zip(names, values)
             ]
     feature_importance = pd.DataFrame(importance_rows)
     if not feature_importance.empty:
@@ -880,6 +887,35 @@ def main() -> None:
         n_bootstrap=200,
     )
 
+    # A temporal-CV winner is not automatically production-worthy. Require it
+    # to beat lifetime frequency on the untouched test PR-AUC and at each
+    # predefined monthly campaign capacity. Otherwise publish as research-only.
+    lifetime_test_ap = float(lifetime_baseline_pr_auc)
+    capacity_comparison = {
+        label: {
+            "model_precision": float(capacity_metrics[label]["precision"]),
+            "lifetime_frequency_precision": float(
+                baseline_capacity_metrics["lifetime_frequency_only"][label]["precision"]
+            ),
+            "beats_baseline": bool(
+                capacity_metrics[label]["precision"]
+                >= baseline_capacity_metrics["lifetime_frequency_only"][label]["precision"]
+            ),
+        }
+        for label in ("5%", "10%", "20%")
+    }
+    promotion_gate = {
+        "test_pr_auc": float(test_metrics["pr_auc"]),
+        "lifetime_frequency_test_pr_auc": lifetime_test_ap,
+        "beats_lifetime_frequency_pr_auc": bool(test_metrics["pr_auc"] > lifetime_test_ap),
+        "capacity_comparison": capacity_comparison,
+        "production_eligible": bool(
+            test_metrics["pr_auc"] > lifetime_test_ap
+            and all(item["beats_baseline"] for item in capacity_comparison.values())
+        ),
+        "rule": "Must beat lifetime-frequency PR-AUC and precision at 5%, 10%, and 20% monthly contact capacity on the untouched chronological test period.",
+    }
+
     train_customer_ids = set(
         df.iloc[train_idx]["customer_unique_id"].astype(str).unique()
     )
@@ -989,7 +1025,7 @@ def main() -> None:
     joblib.dump(calibrated_model, model_path)
 
     metadata = {
-        "pipeline_status": "ready",
+        "pipeline_status": "ready" if promotion_gate["production_eligible"] else "research_only",
         "model_version": MODEL_VERSION,
         "cohort_definition": (
             "Eligible after at least one delivered order; predict the second "
@@ -998,6 +1034,7 @@ def main() -> None:
         "experiment_name": experiment,
         "tracking_uri": get_tracking_uri(),
         "selected_model": selected_name,
+        "promotion_gate": promotion_gate,
         "selection_metric": "cv_average_precision_for_second_purchase_within_90_days_against_rfm_baselines",
         "calibration": {
             "method": "Platt sigmoid",
