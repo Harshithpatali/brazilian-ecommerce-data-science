@@ -43,7 +43,7 @@ Other features include average order value, average delivery delay, active
 purchase months, recency, order/revenue shares, and order-value ratios. The
 prior 180-day window ([t - 360 days, t - 180 days)) measures changes in order
 frequency and revenue. Lifetime features include the delivered-order count,
-customer tenure, and average/median interpurchase gaps with gap variability.
+customer tenure, and average/median positive interpurchase gaps with gap variability. Orders with an identical purchase timestamp are represented by a zero-gap share instead of forcing undefined gap statistics to zero; undefined positive-gap ratios are imputed during model fitting.
 All lifetime history is restricted to purchases and deliveries completed
 before t. Review scores are included only when the review-answer timestamp
 precedes t, because the score is not observable until the customer submits it.
