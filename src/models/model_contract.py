@@ -6,7 +6,7 @@ from typing import Any
 
 from src.features.churn_features import FEATURE_COLS
 
-MODEL_VERSION = "churn-pit-v3"
+MODEL_VERSION = "churn-pit-v4"
 
 _REQUIRED_METRICS = (
     "roc_auc",
@@ -48,6 +48,12 @@ def validate_model_metadata(metadata: dict[str, Any]) -> list[str]:
     if metadata.get("evaluation_positive_class") != "purchase_within_90_days (SQL churned=0)":
         errors.append("evaluation_positive_class must identify repeat purchase (SQL churned=0).")
 
+    if metadata.get("threshold_selection") != "maximum F2 for purchase_within_90_days on separate validation period":
+        errors.append("threshold_selection must use validation F2 for repeat purchase.")
+    threshold_beta = metadata.get("threshold_beta")
+    if not isinstance(threshold_beta, (int, float)) or float(threshold_beta) != 2.0:
+        errors.append("threshold_beta must be 2.0 for recall-oriented F2 selection.")
+
     threshold = metadata.get("threshold")
     repeat_threshold = metadata.get("repeat_purchase_probability_threshold")
     if not isinstance(repeat_threshold, (int, float)) or not isfinite(float(repeat_threshold)):
@@ -65,6 +71,10 @@ def validate_model_metadata(metadata: dict[str, Any]) -> list[str]:
         errors.append("feature_availability is missing or is not an object.")
     elif availability.get("review_score") != "review_answer_timestamp < snapshot_date":
         errors.append("review_score must use review_answer_timestamp as its availability time.")
+    elif availability.get("lifetime_history") != (
+        "purchase_timestamp < snapshot_date and delivered_timestamp < snapshot_date"
+    ):
+        errors.append("lifetime history must be limited to orders observable before the snapshot.")
 
     model_hash = metadata.get("model_sha256")
     if (
