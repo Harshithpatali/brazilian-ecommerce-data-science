@@ -27,7 +27,7 @@ jobs:
       # Connection secrets are read only from GitHub Actions repository secrets.
       # Their values are never echoed in logs.
       DB_CONNECT_TIMEOUT: "30"
-      MLFLOW_EXPERIMENT_NAME: brazilian-ecommerce-churn-v3
+      MLFLOW_EXPERIMENT_NAME: brazilian-ecommerce-churn-v4
     steps:
       - name: Checkout repair branch
         uses: actions/checkout@v4
@@ -74,7 +74,7 @@ jobs:
       - name: Validate target, feature cutoff, review timing and snapshot grain
         run: python -m scripts.validate_churn_data
 
-      - name: Export dataset, tune models and produce v3 artifacts
+      - name: Export dataset, tune models and produce v4 artifacts
         run: python -m scripts.run_ml
 
       - name: Verify v3 metadata and model fingerprint
@@ -101,7 +101,7 @@ jobs:
           if not dataset_path.exists() or dataset_path.stat().st_size == 0:
               raise SystemExit("Refreshed churn dataset is missing or empty.")
 
-          print("v3 model contract passed.")
+          print("v4 model contract passed.")
           print(f"Selected model: {metadata['selected_model']}")
           print(f"Final test metrics: {json.dumps(metadata['test_metrics'], sort_keys=True)}")
           print(f"Dataset rows: {metadata['class_distribution']['all']}")
@@ -122,7 +122,7 @@ jobs:
           if git diff --cached --quiet; then
             echo "No generated artifacts changed."
           else
-            git commit -m "Retrain and publish validated churn v3 artifacts"
+            git commit -m "Retrain and publish validated churn v4 artifacts"
             git push origin HEAD:fix/churn-dashboard-and-data-contracts
           fi
 
@@ -131,7 +131,7 @@ jobs:
         shell: bash
         run: |
           {
-            echo "## Customer churn v3 rebuild"
+            echo "## Customer churn v4 rebuild"
             echo "- Branch: fix/churn-dashboard-and-data-contracts"
             echo "- Database preflight, SQL validation, model training, artifact verification and commit are executed as separate stages."
             if [[ -f models/model_metadata.json ]]; then
