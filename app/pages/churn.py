@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from math import ceil
 from pathlib import Path
 
 import joblib
@@ -308,7 +309,7 @@ def render() -> None:
         "Unseen-customer test subset: "
         f"{unseen.get('customers', 0):,} customers, "
         f"{unseen.get('positive_count', 0):,} repeat-purchase events; "
-        f"PR-AUC {float(unseen.get('pr_auc', 0.0)):.4f}."
+        f"PR-AUC {float(unseen.get('pr_auc') or 0.0):.4f}."
     )
 
     section_title(
@@ -320,7 +321,7 @@ def render() -> None:
         min_value=5, max_value=30, value=10, step=5,
         format="%d%%",
     )
-    target_count = max(1, int(np.ceil(len(latest) * capacity_view / 100.0)))
+    target_count = max(1, int(ceil(len(latest) * capacity_view / 100.0)))
     prospects = latest.nlargest(target_count, "repeat_purchase_probability").copy()
     display_cols = [
         "customer_unique_id", "repeat_purchase_probability",
