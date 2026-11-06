@@ -65,7 +65,6 @@ _BOUNDED_METRICS = (
     "dummy_baseline_pr_auc",
     "recency_only_pr_auc",
     "brier_score",
-    "brier_skill_score",
     "precision_at_5pct",
     "recall_at_5pct",
     "flagged_fraction_at_5pct",
