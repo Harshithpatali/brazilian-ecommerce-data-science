@@ -129,7 +129,7 @@ def validate_model_metadata(metadata: dict[str, Any]) -> list[str]:
                 "purchase_timestamp < snapshot_date and delivered_timestamp < snapshot_date"
             ),
             "prior_order_window": "[snapshot_date - 360 days, snapshot_date - 180 days)",
-            "customer_state": "state from earliest delivered order observable before snapshot_date",
+            "customer_state": "state from most recent delivered order observable before snapshot_date",
             "snapshot_month": "calendar month of snapshot_date",
             "future_orders": "used only to construct the target, never as predictors",
         }
