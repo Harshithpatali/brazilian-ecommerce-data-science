@@ -6,6 +6,14 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
+# Verify that the configured database is the Olist source database before
+# executing any DDL or rebuilding derived analytical objects.
+subprocess.run(
+    [sys.executable, "-m", "scripts.check_source_schema"],
+    check=True,
+    cwd=ROOT,
+)
+
 FOLDERS = [
     "sql/03_data_model",
     "sql/04_kpi_layer",
