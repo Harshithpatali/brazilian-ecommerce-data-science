@@ -1,65 +1,102 @@
-# Churn Model Training and Evaluation
+# Second-Purchase Propensity — Model Training and Evaluation
 
-## Problem
+## Problem definition
 
-Predict whether an eligible customer will have no eventually-delivered order
-placed during the 90 days after a monthly point-in-time snapshot.
+After a customer's first delivered order, predict whether a second delivered
+purchase will occur in the 90 days after each eligible monthly snapshot.
+
+The source SQL target is \`churned\`: 0 means second delivered purchase within
+90 days; 1 means no such purchase. The modeling and reporting positive class
+is \`1 - churned\`.
 
 ## Candidate models
 
 1. Logistic Regression — interpretable linear baseline with balanced class weights.
-2. HistGradientBoosting — nonlinear boosted-tree model for tabular data.
-3. Random Forest — class-balanced, shallow/regularized bagged-tree candidate.
+2. HistGradientBoosting — nonlinear boosted-tree candidate for tabular data.
+3. Random Forest — class-balanced bagged-tree candidate.
 
-The current implementation compares all three candidates.
+The candidate with the highest mean purged temporal-CV average precision for
+second purchase is selected. Hyperparameter selection does not use validation
+or final-test scores.
 
-## Class imbalance and scoring objective
+## Data population
 
-The rebuilt dataset contains 10,570 customer-month snapshots. Only 306 (2.89%)
-have a delivered purchase in the next 90 days; 10,264 (97.11%) do not.
+The connected Olist source audit found 99,441 source orders, 96,470 delivered
+orders and 93,350 delivered customers. The first-delivered cohort query found
+357,413 eligible customer-month snapshots for 79,594 customers and 2,686
+second-purchase events (0.752%). These are source/cohort audit counts, not a
+substitute for final pipeline or holdout metrics.
 
-The estimator is fitted to the SQL target \`churned\`, where 1 means no delivered
-purchase. To avoid optimizing for this near-constant majority class, temporal
-CV average precision is computed for the minority repeat-purchase event
-(\`1 - churned\`). The model retains its churn-probability output, and
-repeat-purchase probability is its complement.
+The training pipeline fails fast when it receives fewer than 300,000 rows,
+70,000 unique customers or 2,000 positive second-purchase events. This
+prevents the earlier, much smaller third-or-later-purchase cohort from being
+mistaken for the second-purchase training population.
 
-## Training and selection
+## Temporal model selection
 
-- Unique snapshot dates remain intact when constructing temporal folds.
-- Expanding-window cross-validation runs on the training period with a 90-day
-  purge between each fold's training and validation dates.
-- GridSearchCV optimizes average precision for repeat purchase within 90 days.
-- The winning model and hyperparameters are selected using CV PR-AUC only.
-  Final holdout metrics are never used to choose a candidate.
+- Snapshots are split by unique calendar date; same-date customers never
+  straddle a partition or fold.
+- Train, validation and final test are chronological with a 90-day embargo
+  between adjacent periods.
+- Expanding-window cross-validation uses 90-day purging so no training
+  label window overlaps its fold's validation block.
+- GridSearchCV scores \`P(second purchase within 90 days)\` using average
+  precision (PR-AUC).
+- Prior-probability, recency-only, recent-order-frequency-only and
+  lifetime-order-frequency-only baselines are scored on the same final holdout.
 
-## Validation and final holdout
+## Probability calibration
 
-Unique dates are separated chronologically into train, validation, and final
-test periods. A 90-day embargo is applied between each period because the
-target looks 90 days into the future. Snapshots whose outcome windows overlap
-the next period are excluded from the earlier partition.
+A Platt sigmoid is fitted from purged out-of-fold training predictions only.
+It is not fitted on the validation period or final test period. The validation
+period is used to select a diagnostic F2 operating threshold. The calibrated
+model and threshold are frozen before final-test evaluation.
 
-- Validation selects the repeat-purchase probability threshold by maximum F2 (beta=2), deliberately favoring recall. The complementary churn-probability cutoff is stored for risk scoring.
-- The final test period is evaluated once after the model and threshold are frozen.
-- Test PR-AUC, ROC-AUC and F1 focus on the minority repeat-purchase event and
-  are compared with a DummyClassifier prior-probability baseline.
-- Reports also include both classes' precision/recall/F1, balanced accuracy,
-  and Matthews correlation coefficient.
-- The F2 threshold is not business-optimal without an intervention cost model and false-positive costs.
-- The v4 holdout results were PR-AUC 0.0472 vs. prior baseline 0.0242, recall 65.18%, precision 3.62%, and F2 0.1482. The model flagged 43.6% of holdout rows; use a validation-selected precision floor or a known campaign-capacity constraint before operational use.
+Calibration metrics on the final test include Brier score, log-loss,
+expected calibration error and reliability-bin summaries. Calibration is
+reported separately from discrimination: a calibrated model can still have
+weak ranking power.
 
-## Outputs
+## Campaign-capacity evaluation
 
-Running \`python -m scripts.run_ml\` writes:
-- \`models/best_churn_model.joblib\` — selected fitted pipeline;
-- \`models/model_comparison.csv\` — repeat-purchase CV PR-AUC and candidate parameters;
-- \`models/model_metadata.json\` — version, periods, threshold, class distributions,
-  baseline and final test metrics;
-- \`models/test_predictions.parquet\` — final test predictions;
-- \`models/test_classification_report.json\` — class-level report;
-- \`models/test_confusion_matrix.json\` — confusion matrix;
-- \`models/test_precision_recall_curve.csv\` — repeat-purchase precision-recall curve.
+For each monthly test cohort, customers are ranked by calibrated
+second-purchase probability. The evaluation reports:
+- Precision@K and recall@K at top 5%, 10% and 20% monthly contact capacity;
+- number of customers contacted and repeat purchases captured;
+- lift over the cohort's observed repeat-purchase prevalence.
 
-The dashboard refuses to serve older artifacts until metadata confirms the
-corrected pipeline version has been trained.
+These metrics answer the practical question: *given a fixed monthly outreach
+budget, how many future second purchases occur among the customers selected?*
+They are offline ranking estimates, not incremental lift caused by a campaign.
+
+## Generalization and uncertainty
+
+- A known-customer future test result is reported.
+- Customers absent from both training and validation are isolated within the
+  chronological test and evaluated separately.
+- A customer-cluster bootstrap resamples customers, retaining each sampled
+  customer's monthly rows together, to estimate a 95% PR-AUC interval.
+  This accounts for within-customer dependence better than treating each
+  customer-month as independent.
+
+## Output artifacts
+
+The v5 pipeline writes:
+- \`models/best_churn_model.joblib\` — selected Platt-calibrated model wrapper;
+- \`models/model_comparison.csv\` — temporal-CV PR-AUC and parameters;
+- \`models/model_metadata.json\` — cohort definition, partitions, calibration,
+  test metrics, customer overlap, capacity metrics, baselines and CI;
+- \`models/test_predictions.parquet\` — final holdout predictions;
+- \`models/test_classification_report.json\` and
+  \`models/test_confusion_matrix.json\` — thresholded final-test report;
+- \`models/test_precision_recall_curve.csv\` — threshold-independent ranking curve;
+- \`models/test_capacity_metrics.json\` — top-5/10/20% monthly campaign metrics;
+- \`models/test_calibration_bins.csv\` — reliability-bin data.
+
+## Interpretation limits
+
+Strong offline prediction does not prove a retention campaign will cause
+additional orders. Incremental campaign lift requires randomized treatment
+and control groups. Thresholds must reflect the real contact budget,
+intervention cost and minimum acceptable precision; the final holdout must
+remain reserved for the final unbiased report.
