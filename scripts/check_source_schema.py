@@ -40,6 +40,8 @@ REQUIRED_SOURCE_COLUMNS = {
     "olist_order_payments": {
         "order_id",
         "payment_value",
+        "payment_type",
+        "payment_installments",
     },
     "olist_order_reviews": {
         "order_id",
