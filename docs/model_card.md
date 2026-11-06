@@ -36,9 +36,13 @@ and hyperparameters are selected with expanding-window temporal CV grouped by
 unique snapshot dates. The threshold is selected on a separate validation
 period by maximizing F1. The final chronological holdout is evaluated once.
 
-Reports include class prevalence, average precision, ROC-AUC, per-class
-precision/recall/F1, balanced accuracy, Matthews correlation coefficient,
-confusion matrix, and prior-probability dummy baseline.
+Model selection and PR-AUC reporting focus on the minority event: a delivered
+purchase within 90 days (`churned = 0`). The probability threshold is selected
+by validation F1 for this event; the complementary churn-probability cutoff is
+used for customer risk scoring. Reports include repeat-purchase prevalence,
+PR-AUC, ROC-AUC, both classes' precision/recall/F1, balanced accuracy,
+Matthews correlation coefficient, confusion matrix, and a prior-probability
+dummy baseline. PR-AUC must be compared with repeat-purchase prevalence.
 
 ## Limitations
 
