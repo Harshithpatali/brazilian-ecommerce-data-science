@@ -1,17 +1,18 @@
 {
   "labels": [
     "purchase_within_90_days",
-    "churned"
+    "no_purchase_within_90_days"
   ],
   "matrix": [
     [
-      73,
-      39
+      152,
+      730
     ],
     [
-      1942,
-      2566
+      14170,
+      128156
     ]
   ],
-  "threshold": 0.9990765283209141
+  "policy": "top_10_percent_per_snapshot_date",
+  "capacity_fraction": 0.1
 }

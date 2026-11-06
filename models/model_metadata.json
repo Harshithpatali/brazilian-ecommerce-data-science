@@ -1,32 +1,31 @@
 {
   "pipeline_status": "ready",
-  "model_version": "churn-pit-v4",
-  "experiment_name": "brazilian-ecommerce-churn-v4",
+  "model_version": "churn-pit-v5",
+  "experiment_name": "brazilian-ecommerce-repeat-propensity-v5",
   "tracking_uri": "file:///home/runner/work/brazilian-ecommerce-data-science/brazilian-ecommerce-data-science/mlruns",
-  "selected_model": "hist_gradient_boosting",
-  "selection_metric": "cv_average_precision_for_purchase_within_90_days",
-  "threshold_objective": "F2",
-  "threshold_beta": 2.0,
+  "selected_model": "logistic_regression",
+  "selection_metric": "purged_temporal_cv_average_precision_for_repeat_purchase_90d",
   "best_params": {
-    "model__l2_regularization": 0.0,
-    "model__learning_rate": 0.03,
-    "model__max_iter": 300,
-    "model__max_leaf_nodes": 31,
-    "model__min_samples_leaf": 20
+    "model__C": 5.0,
+    "model__solver": "lbfgs"
   },
-  "threshold": 0.9990765283209141,
-  "threshold_selection": "maximum F2 for purchase_within_90_days on separate validation period",
-  "repeat_purchase_probability_threshold": 0.0009234716790860187,
+  "threshold": 0.9917003974917671,
+  "repeat_purchase_probability_threshold": 0.008299602508233027,
+  "threshold_selection": "validation 90th percentile calibrated repeat-purchase probability; operational ranking selects the top 10 percent per monthly snapshot",
+  "threshold_policy": "top_10_percent_per_snapshot_date",
+  "capacity_fraction": 0.1,
+  "calibration_method": "Platt sigmoid fitted on separate chronological validation period",
+  "calibration_intercept": -4.778451069579346,
+  "calibration_slope": 0.0060454751675633935,
+  "validation_threshold_metrics": {
+    "capacity_fraction": 0.1,
+    "precision": 0.013138686131386862,
+    "recall": 0.16071428571428573,
+    "flagged_fraction": 0.10002085940759282
+  },
   "evaluation_positive_class": "purchase_within_90_days (SQL churned=0)",
-  "threshold_validation_metrics": {
-    "precision": 0.04753820033955857,
-    "recall": 0.509090909090909,
-    "f1": 0.08695652173913043,
-    "f2": 0.173053152039555,
-    "beta": 2.0,
-    "repeat_purchase_probability_threshold": 0.0009234716790860187
-  },
-  "target_definition": "1 when no eventually-delivered order has a purchase timestamp in [snapshot_date, snapshot_date + 90 days); otherwise 0.",
+  "target_definition": "churned=1 when no eventually-delivered order has a purchase timestamp in [snapshot_date, snapshot_date + 90 days); repeat purchase is churned=0.",
+  "population_definition": "Monthly customer snapshots after each customer's first delivered order, when at least one delivered order was purchased and delivered in the prior 180 days.",
   "feature_columns": [
     "orders_180d",
     "orders_90d",
@@ -54,11 +53,15 @@
     "recent_revenue_share",
     "orders_per_active_month",
     "revenue_per_order",
-    "recent_vs_older_order_ratio"
+    "recent_vs_older_order_ratio",
+    "customer_state",
+    "snapshot_month"
   ],
   "feature_availability": {
     "historical_orders": "order_purchase_timestamp < snapshot_date and order_delivered_customer_date < snapshot_date",
     "review_score": "review_answer_timestamp < snapshot_date",
+    "customer_state": "state from most recent delivered order observable before snapshot_date",
+    "snapshot_month": "calendar month of snapshot_date",
     "lifetime_history": "purchase_timestamp < snapshot_date and delivered_timestamp < snapshot_date",
     "prior_order_window": "[snapshot_date - 360 days, snapshot_date - 180 days)",
     "future_orders": "used only to construct the target, never as predictors"
@@ -67,7 +70,7 @@
   "max_historical_lookback_days": 360,
   "prediction_window_days": 90,
   "label_horizon_embargo_days": 90,
-  "evaluation_design": "Unique snapshot dates split chronologically into train, validation and final test with a 90-day embargo at period boundaries; CV folds are grouped by unique date and purge overlapping 90-day label windows. Customers can appear in earlier and later periods because the use case is future scoring of known customers.",
+  "evaluation_design": "Customer-month decisions are split chronologically by unique snapshot date. Each partition boundary has a 90-day purge. CV uses expanding windows grouped by snapshot date, with minimum positive-event counts in each fold. Customers can appear in multiple months, matching known-customer monthly CRM scoring. Uncertainty intervals use customer-cluster bootstrap.",
   "periods": {
     "train_start": "2016-11-01",
     "train_end": "2017-09-01",
@@ -79,54 +82,117 @@
   },
   "class_distribution": {
     "all": {
-      "0": 306,
-      "1": 10264
+      "0": 2686,
+      "1": 354727
     },
     "train": {
-      "0": 41,
-      "1": 1461
+      "0": 569,
+      "1": 66995
     },
     "validation": {
-      "0": 55,
-      "1": 1424
+      "0": 392,
+      "1": 47548
     },
     "test": {
-      "0": 112,
-      "1": 4508
+      "0": 882,
+      "1": 142326
     }
   },
+  "partition_rows": {
+    "all": 357413,
+    "train": 67564,
+    "validation": 47940,
+    "test": 143208
+  },
+  "unique_customers": {
+    "all": 79594,
+    "train": 20317,
+    "validation": 29015,
+    "test": 54217
+  },
   "test_metrics": {
-    "roc_auc": 0.6554607285460767,
-    "pr_auc": 0.04718327498935814,
-    "precision": 0.036228287841191066,
-    "recall": 0.6517857142857143,
-    "f1": 0.0686412787964269,
-    "f2": 0.14819326025172555,
-    "class_0_precision": 0.036228287841191066,
-    "class_0_recall": 0.6517857142857143,
-    "class_0_f1": 0.0686412787964269,
-    "class_1_precision": 0.9850287907869482,
-    "class_1_recall": 0.5692102928127772,
-    "class_1_f1": 0.7214958526641361,
-    "balanced_accuracy": 0.6104980035492458,
-    "matthews_corrcoef": 0.06853998467608126,
-    "positive_prevalence": 0.024242424242424242,
-    "threshold": 0.9990765283209141,
-    "dummy_baseline_pr_auc": 0.024242424242424242,
-    "pr_auc_lift_over_dummy": 0.0229408507469339
+    "roc_auc": 0.5488367177738259,
+    "gini": 0.09767343554765184,
+    "ks_statistic": 0.08547622919156284,
+    "pr_auc": 0.009517962738565498,
+    "precision": 0.010613042871107387,
+    "recall": 0.17233560090702948,
+    "f1": 0.019994738226782424,
+    "f2": 0.04257703081232493,
+    "class_0_precision": 0.010613042871107387,
+    "class_0_recall": 0.17233560090702948,
+    "class_0_f1": 0.019994738226782424,
+    "class_1_precision": 0.9943360799466195,
+    "class_1_recall": 0.9004398353076739,
+    "class_1_f1": 0.9450614279604147,
+    "balanced_accuracy": 0.5363877181073518,
+    "matthews_corrcoef": 0.01897826577799499,
+    "positive_prevalence": 0.006158873805932629,
+    "dummy_baseline_pr_auc": 0.006158873805932629,
+    "pr_auc_lift_over_dummy": 0.003359088932632869,
+    "recency_only_pr_auc": 0.00792794178145024,
+    "pr_auc_lift_over_recency": 1.2005591111725342,
+    "brier_score": 0.0061255586171427645,
+    "log_loss": 0.03779572500473365,
+    "expected_calibration_error": 0.00254101456931342,
+    "brier_skill_score": 8.220520228996442e-05,
+    "precision_at_5pct": 0.012845573862049707,
+    "recall_at_5pct": 0.10430839002267574,
+    "lift_at_5pct": 2.085701747887091,
+    "flagged_fraction_at_5pct": 0.05001117256019217,
+    "precision_at_10pct": 0.010613042871107387,
+    "recall_at_10pct": 0.17233560090702948,
+    "lift_at_10pct": 1.7232116139291913,
+    "flagged_fraction_at_10pct": 0.10000837942014412,
+    "precision_at_20pct": 0.008483748210732117,
+    "recall_at_20pct": 0.2755102040816326,
+    "lift_at_20pct": 1.3774836890731577,
+    "flagged_fraction_at_20pct": 0.20000977599016814
+  },
+  "customer_bootstrap_pr_auc_95_ci": {
+    "lower_95": 0.007707260041255007,
+    "upper_95": 0.012073798418779202,
+    "replicates": 500
+  },
+  "customer_bootstrap_top10_95_ci": {
+    "precision": {
+      "lower_95": 0.008795642792866492,
+      "upper_95": 0.012579782741741758,
+      "replicates": 200
+    },
+    "recall": {
+      "lower_95": 0.14301149485524534,
+      "upper_95": 0.202604953756876,
+      "replicates": 200
+    },
+    "lift": {
+      "lower_95": 1.4299662944439047,
+      "upper_95": 2.025769207771855,
+      "replicates": 200
+    },
+    "flagged_fraction": {
+      "lower_95": 0.10000349458634931,
+      "upper_95": 0.10001957490997361,
+      "replicates": 200
+    }
   },
   "dummy_baseline": {
-    "strategy": "prior",
-    "test_pr_auc": 0.024242424242424242,
-    "test_positive_prevalence": 0.024242424242424242
+    "strategy": "training_prevalence",
+    "train_positive_prevalence": 0.008421644662838198,
+    "test_pr_auc": 0.006158873805932629,
+    "test_positive_prevalence": 0.006158873805932629,
+    "test_brier_score": 0.0061260622113260875,
+    "test_log_loss": 0.037825852690300366,
+    "recency_only_pr_auc": 0.00792794178145024
   },
-  "model_sha256": "159f86b89934f824fd8d1b1363d19b392dcdbda2d8e744a09d5c03184f680ec7",
+  "model_sha256": "379d01fca963de3d8ce566bfd2f658ca7e7c74da8dd18074b878d4812fe9eb6b",
   "artifacts": {
     "model": "models/best_churn_model.joblib",
     "comparison": "models/model_comparison.csv",
     "test_predictions": "models/test_predictions.parquet",
     "classification_report": "models/test_classification_report.json",
     "confusion_matrix": "models/test_confusion_matrix.json",
-    "precision_recall_curve": "models/test_precision_recall_curve.csv"
+    "precision_recall_curve": "models/test_precision_recall_curve.csv",
+    "calibration": "models/test_calibration.csv"
   }
 }
