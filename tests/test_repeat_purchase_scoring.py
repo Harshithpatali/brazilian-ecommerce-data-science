@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 
 from src.models.train_churn import (
-    choose_f1_threshold,
+    choose_fbeta_threshold,
     repeat_purchase_average_precision_scorer,
 )
 
@@ -29,14 +29,33 @@ def test_cv_scorer_ranks_repeat_purchase_event_not_majority_churn_event():
     )
 
 
-def test_validation_f1_threshold_targets_repeat_purchase_and_returns_churn_cutoff():
-    y_churned = np.array([0, 1, 0, 1])
-    p_churn = np.array([0.1, 0.9, 0.2, 0.8])
+def test_f2_threshold_prefers_recall_at_least_as_much_as_f1():
+    y_churned = np.array([0, 0, 0, 1, 1, 1])
+    churn_probabilities = np.array([0.1, 0.4, 0.7, 0.8, 0.9, 0.95])
 
-    churn_cutoff, metrics = choose_f1_threshold(y_churned, p_churn)
+    f1_churn_cutoff, f1_metrics = choose_fbeta_threshold(
+        y_churned, churn_probabilities, beta=1.0
+    )
+    f2_churn_cutoff, f2_metrics = choose_fbeta_threshold(
+        y_churned, churn_probabilities, beta=2.0
+    )
 
-    assert 0.19 < churn_cutoff < 0.21
-    assert metrics["f1"] == 1.0
+    assert f2_metrics["recall"] >= f1_metrics["recall"]
+    assert f2_metrics["repeat_purchase_probability_threshold"] <= (
+        f1_metrics["repeat_purchase_probability_threshold"]
+    )
     assert abs(
-        churn_cutoff + metrics["repeat_purchase_probability_threshold"] - 1.0
+        f2_churn_cutoff + f2_metrics["repeat_purchase_probability_threshold"] - 1.0
     ) < 1e-12
+    assert f2_metrics["f2"] >= 0.0
+
+
+def test_fbeta_rejects_non_positive_beta():
+    y_churned = np.array([0, 1])
+    probabilities = np.array([0.1, 0.9])
+    try:
+        choose_fbeta_threshold(y_churned, probabilities, beta=0)
+    except ValueError as exc:
+        assert "beta" in str(exc)
+    else:
+        raise AssertionError("Expected an invalid beta to raise ValueError")
