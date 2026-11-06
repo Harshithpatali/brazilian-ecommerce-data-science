@@ -16,6 +16,7 @@ EXPECTED_ZERO_CHECKS = (
     "invalid_feature_rows",
     "incomplete_label_windows",
     "review_feature_mismatches",
+    "invalid_history_feature_rows",
 )
 
 
@@ -97,6 +98,16 @@ def main() -> None:
           (SELECT COUNT(*) FILTER (
               WHERE orders_180d <= 0 OR recency_days < 0 OR recency_days > 180
            ) FROM ml.customer_churn_dataset) AS invalid_feature_rows,
+          (SELECT COUNT(*) FILTER (
+              WHERE lifetime_delivered_orders < orders_180d
+                 OR customer_tenure_days < recency_days
+                 OR customer_tenure_days < 0
+                 OR avg_interpurchase_days <= 0
+                 OR median_interpurchase_days <= 0
+                 OR recency_to_avg_interpurchase_ratio < 0
+                 OR orders_prior_180d < 0
+                 OR revenue_prior_180d < 0
+           ) FROM ml.customer_churn_dataset) AS invalid_history_feature_rows,
           (SELECT COUNT(*)
            FROM ml.customer_churn_dataset dataset
            CROSS JOIN source_end
