@@ -61,5 +61,7 @@ def test_v5_sql_adds_state_and_month_without_future_information():
     assert "COALESCE(c.customer_state, 'UNKNOWN')" in sql
     assert "EXTRACT(MONTH FROM s.snapshot_date)" in sql
     assert "FIRST_VALUE(d.customer_state)" in sql
+    assert "ORDER BY d.order_purchase_timestamp DESC, d.order_id DESC" in sql
+    assert "latest_customer_state" in sql
     assert "d.order_purchase_timestamp < s.snapshot_date" in sql
     assert "d.order_delivered_customer_date < s.snapshot_date" in sql
