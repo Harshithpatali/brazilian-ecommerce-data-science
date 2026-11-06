@@ -749,6 +749,13 @@ def main() -> None:
                 {"feature": feature, "importance": float(value)}
                 for feature, value in zip(names, values)
             ]
+    elif isinstance(fitted_estimator, UnivariateRepeatPurchaseBaseline):
+        # A baseline is a legitimate CV winner, but has no tree coefficients.
+        # Surface its single decision feature instead of publishing an empty report.
+        importance_rows = [{
+            "feature": fitted_estimator.feature_name,
+            "importance": 1.0,
+        }]
     feature_importance = pd.DataFrame(importance_rows)
     if not feature_importance.empty:
         feature_importance = feature_importance.sort_values(
@@ -899,7 +906,7 @@ def main() -> None:
             ),
             "beats_baseline": bool(
                 capacity_metrics[label]["precision"]
-                >= baseline_capacity_metrics["lifetime_frequency_only"][label]["precision"]
+                > baseline_capacity_metrics["lifetime_frequency_only"][label]["precision"]
             ),
         }
         for label in ("5%", "10%", "20%")
