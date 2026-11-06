@@ -33,6 +33,10 @@ _REQUIRED_METRICS = (
     "recency_baseline_pr_auc",
     "frequency_baseline_pr_auc",
     "lifetime_frequency_baseline_pr_auc",
+    "prior_dummy_brier_score",
+    "prior_dummy_log_loss",
+    "mean_predicted_repeat_probability",
+    "predicted_to_observed_rate_ratio",
 )
 
 
