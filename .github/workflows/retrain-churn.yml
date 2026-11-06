@@ -3,7 +3,7 @@ name: Rebuild and retrain customer churn
 on:
   push:
     branches:
-      - fix/churn-dashboard-and-data-contracts
+      - main
     paths:
       - ".github/workflows/retrain-churn.yml"
       - "app/**"
@@ -40,7 +40,7 @@ jobs:
       - name: Checkout repair branch
         uses: actions/checkout@v4
         with:
-          ref: fix/churn-dashboard-and-data-contracts
+          ref: ${{ github.ref }}
           fetch-depth: 0
 
       - name: Set up Python 3.12
@@ -125,7 +125,8 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
           # Do not publish artifacts generated from a stale source commit.
-          git fetch origin fix/churn-dashboard-and-data-contracts
+          TARGET_BRANCH="${GITHUB_REF_NAME}"
+          git fetch origin "$TARGET_BRANCH"
           LOCAL_SOURCE_SHA="$(git rev-parse HEAD)"
           REMOTE_SOURCE_SHA="$(git rev-parse FETCH_HEAD)"
           if [[ "$LOCAL_SOURCE_SHA" != "$REMOTE_SOURCE_SHA" ]]; then
@@ -152,7 +153,7 @@ jobs:
             echo "No generated artifacts changed."
           else
             git commit -m "Retrain and publish validated churn v5 artifacts"
-            git push origin HEAD:fix/churn-dashboard-and-data-contracts
+            git push origin "HEAD:${TARGET_BRANCH}"
           fi
 
       - name: Publish run summary
@@ -161,7 +162,7 @@ jobs:
         run: |
           {
             echo "## Second-purchase propensity v5 rebuild"
-            echo "- Branch: fix/churn-dashboard-and-data-contracts"
+            echo "- Branch: ${GITHUB_REF_NAME}"
             echo "- Database preflight, SQL validation, model training, artifact verification and commit are executed as separate stages."
             if [[ -f models/model_metadata.json ]]; then
               echo "- Model metadata file exists in the runner."
