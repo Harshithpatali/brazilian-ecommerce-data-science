@@ -194,7 +194,7 @@ def test_negative_brier_skill_is_a_valid_evaluation_result():
 def test_customer_bootstrap_interval_must_be_valid():
     metadata = valid_metadata()
     metadata["customer_bootstrap_pr_auc_95_ci"]["lower_95"] = 0.20
-    assert any("customer-bootstrap PR-AUC interval" in error for error in validate_model_metadata(metadata))
+    assert any("Customer-bootstrap PR-AUC interval" in error for error in validate_model_metadata(metadata))
 
 
 
