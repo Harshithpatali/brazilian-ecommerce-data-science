@@ -47,6 +47,7 @@ the next period are excluded from the earlier partition.
 - Reports also include both classes' precision/recall/F1, balanced accuracy,
   and Matthews correlation coefficient.
 - The F2 threshold is not business-optimal without an intervention cost model and false-positive costs.
+- The v4 holdout results were PR-AUC 0.0472 vs. prior baseline 0.0242, recall 65.18%, precision 3.62%, and F2 0.1482. The model flagged 43.6% of holdout rows; use a validation-selected precision floor or a known campaign-capacity constraint before operational use.
 
 ## Outputs
 
