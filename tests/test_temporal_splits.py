@@ -127,7 +127,7 @@ def test_v5_population_has_sufficient_positive_examples_in_purged_folds():
 
 def test_purged_cv_rejects_folds_without_minimum_positive_support():
     dates = sample_dates()
-    labels = pd.Series([0, 1, 1] * 60)
+    labels = pd.Series([0, 1, 1] * 20)
     with pytest.raises(ValueError, match="enough repeat-purchase events"):
         make_date_grouped_splits(
             dates, y=labels, n_splits=4, min_positive_count=100
