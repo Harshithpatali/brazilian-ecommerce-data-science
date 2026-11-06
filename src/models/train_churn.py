@@ -124,7 +124,7 @@ def make_date_grouped_splits(
     y: pd.Series | np.ndarray | None = None,
     n_splits: int = 3,
     horizon_days: int = 90,
-    min_positive_count: int = 15,
+    min_positive_count: int = 1,
 ) -> list[tuple[np.ndarray, np.ndarray]]:
     """
     Expanding-window CV grouped by snapshot date and purged by the label horizon.
