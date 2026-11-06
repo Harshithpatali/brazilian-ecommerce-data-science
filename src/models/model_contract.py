@@ -53,6 +53,11 @@ def validate_model_metadata(metadata: dict[str, Any]) -> list[str]:
         errors.append("repeat_purchase_probability_threshold must be finite.")
     elif not 0 <= float(repeat_threshold) <= 1:
         errors.append("repeat_purchase_probability_threshold must be between 0 and 1.")
+    elif isinstance(threshold, (int, float)) and isfinite(float(threshold)):
+        if abs(float(threshold) + float(repeat_threshold) - 1.0) > 1e-12:
+            errors.append(
+                "Churn and repeat-purchase probability thresholds must be complementary."
+            )
 
     availability = metadata.get("feature_availability")
     if not isinstance(availability, dict):
