@@ -46,6 +46,10 @@ def main() -> None:
     print(monthly.to_string(index=False))
 
     checks = query_to_dataframe("""
+        WITH source_end AS (
+            SELECT MAX(order_purchase_timestamp) AS max_purchase_timestamp
+            FROM analytics.order_level
+        )
         SELECT
           (SELECT COUNT(*) FROM (
               SELECT customer_unique_id, snapshot_date
@@ -59,9 +63,38 @@ def main() -> None:
                     AND f.order_purchase_timestamp >= dataset.snapshot_date
                     AND f.order_purchase_timestamp < dataset.snapshot_date + INTERVAL '90 days'
               ) THEN 0 ELSE 1 END
-           ) FROM ml.customer_churn_dataset dataset) AS target_mismatches
+           ) FROM ml.customer_churn_dataset dataset) AS target_mismatches,
+          (SELECT COUNT(*) FILTER (
+              WHERE orders_180d <= 0 OR recency_days < 0 OR recency_days > 180
+           ) FROM ml.customer_churn_dataset) AS invalid_feature_rows,
+          (SELECT COUNT(*)
+           FROM ml.customer_churn_dataset dataset
+           CROSS JOIN source_end
+           WHERE dataset.snapshot_date + INTERVAL '90 days'
+                 > source_end.max_purchase_timestamp) AS incomplete_label_windows,
+          (SELECT COUNT(*)
+           FROM ml.customer_churn_dataset dataset
+           CROSS JOIN LATERAL (
+               SELECT AVG(order_review.order_avg_review_score)::numeric
+                   AS expected_avg_review_score_180d
+               FROM ml.delivered_orders d
+               CROSS JOIN LATERAL (
+                   SELECT AVG(r.review_score)::numeric AS order_avg_review_score
+                   FROM ml.review_events r
+                   WHERE r.order_id = d.order_id
+                     AND r.review_answer_timestamp < dataset.snapshot_date
+               ) order_review
+               WHERE d.customer_unique_id = dataset.customer_unique_id
+                 AND d.order_purchase_timestamp >= dataset.snapshot_date - INTERVAL '180 days'
+                 AND d.order_purchase_timestamp < dataset.snapshot_date
+                 AND d.order_delivered_customer_date < dataset.snapshot_date
+                 AND order_review.order_avg_review_score IS NOT NULL
+           ) expected
+           WHERE dataset.avg_review_score_180d
+                 IS DISTINCT FROM expected.expected_avg_review_score_180d
+          ) AS review_feature_mismatches
     """)
-    print("\nIntegrity checks (both counts should be zero)")
+    print("\nIntegrity checks (all counts should be zero)")
     print(checks.to_string(index=False))
 
 
