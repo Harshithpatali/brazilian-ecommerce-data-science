@@ -40,9 +40,13 @@ For snapshot date t, historical order features use purchase timestamps in
 and 30-day order/revenue counts are nested windows within the 180-day window.
 
 Other features include average order value, average delivery delay, active
-purchase months, recency, order/revenue shares, and order-value ratios. Review
-scores are included only when the review-answer timestamp precedes t, because
-the score is not observable until the customer submits the review.
+purchase months, recency, order/revenue shares, and order-value ratios. The
+prior 180-day window ([t - 360 days, t - 180 days)) measures changes in order
+frequency and revenue. Lifetime features include the delivered-order count,
+customer tenure, and average/median interpurchase gaps with gap variability.
+All lifetime history is restricted to purchases and deliveries completed
+before t. Review scores are included only when the review-answer timestamp
+precedes t, because the score is not observable until the customer submits it.
 
 ## Temporal evaluation protocol
 
@@ -63,10 +67,11 @@ predictions for known customers, matching the intended use case.
 The candidate model is selected by mean CV average precision (PR-AUC) for the
 minority event: a delivered purchase within 90 days (SQL `churned = 0`). This
 avoids optimizing PR-AUC for the 97% majority no-purchase class. The threshold
-is selected by maximizing F1 for repeat purchase on the separate validation
-period; the equivalent complementary churn-probability cutoff is stored for
-risk scoring. Since no business cost matrix is supplied, this is a technical
-proxy rather than a proven profit-maximizing intervention threshold.
+is selected by maximizing F2 (beta=2) for repeat purchase on the separate
+validation period. This deliberately weights recall more heavily than
+precision; the equivalent complementary churn-probability cutoff is stored
+for risk scoring. Since no business cost matrix is supplied, F2 remains a
+technical proxy rather than a proven profit-maximizing intervention threshold.
 
 The frozen model and threshold are evaluated once on the final chronological
 holdout. A 90-day embargo separates validation labels from final-test snapshots.
@@ -102,5 +107,5 @@ PR-AUC alone is not evidence of useful discrimination when positives are common.
   periods. It is not unseen-customer generalization.
 - Final delivery status is used retrospectively to define delivered events;
   predictors are restricted to information observable at snapshot time.
-- F1-based threshold selection does not encode intervention economics.
+- F2-based threshold selection does not encode intervention economics or the cost of false positives.
 - Olist is a historical dataset, not a live marketplace feed.
