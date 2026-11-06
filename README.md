@@ -251,7 +251,7 @@ Every script is designed to be **rerunnable against a live database** without ma
 - **Population:** customers who have reached their second delivered order and have at least one order purchased and delivered in the prior 180 days.
 - **Snapshot logic:** monthly snapshots begin after the customer's second delivered order. A snapshot is included only when the full 90-day forward observation window is present. All eligible snapshots remain in the dataset, allowing customers to reactivate after a period of inactivity.
 - **Target:** `churned = 1` when no eventually-delivered order has a purchase timestamp in the half-open interval `[snapshot_date, snapshot_date + 90 days)`. A purchase exactly at the 90-day boundary is outside the window.
-- **Leakage control:** historical orders must be purchased and delivered before the snapshot; review scores are included only when the review was submitted before the snapshot. Future orders are used only to create the target. Snapshots without a complete 90-day future window are excluded.
+- **Leakage control:** historical orders must be purchased and delivered before the snapshot; review scores are included only when `review_answer_timestamp` is before the snapshot, and multiple review rows are averaged within each order before customer-level aggregation. Future orders are used only to create the target. Snapshots without a complete 90-day future window are excluded.
 - **Features:** 30/90/180-day rolling order counts and revenue, average order value, average review score, average delivery delay, active months, recency, recent order/revenue share, orders per active month, revenue per order, and recent-vs-older order ratio.
 
 ### Model comparison
@@ -392,7 +392,7 @@ python scripts/check_connection.py
 
 ### 5. Build the full SQL analytical layer + ML dataset
 
-The simplest path is the single orchestrator script, which runs every SQL folder in order:
+The simplest path is the single orchestrator script. It first performs a read-only preflight of the nine required Olist source tables/columns, then runs each SQL folder in order. If the connected database is not the expected Olist database, the build stops before any project DDL runs:
 
 ```bash
 python -m scripts.build_all
