@@ -41,7 +41,8 @@ and 30-day order/revenue counts are nested windows within the 180-day window.
 
 Other features include average order value, average delivery delay, active
 purchase months, recency, order/revenue shares, and order-value ratios. Review
-scores are included only when the review-creation timestamp precedes t.
+scores are included only when the review-answer timestamp precedes t, because
+the score is not observable until the customer submits the review.
 
 ## Temporal evaluation protocol
 
