@@ -256,7 +256,7 @@ Every script is designed to be **rerunnable against a live database** without ma
 
 ### Model comparison
 
-Two model families are tuned with **expanding-window temporal cross-validation grouped by unique snapshot dates** and GridSearchCV, optimizing average precision (PR-AUC):
+Two model families are tuned with **expanding-window temporal cross-validation grouped by unique snapshot dates**, a 90-day embargo between fold periods, and GridSearchCV, optimizing average precision (PR-AUC):
 
 | # | Model | Type | Why it's included |
 |---|---|---|---|
@@ -283,7 +283,7 @@ flowchart LR
 
 The performance-optimized build first materializes delivered orders into a compact `ml.delivered_orders` table, aggregates to `ml.customer_monthly_activity`, and only then constructs the point-in-time dataset — avoiding an expensive snapshot × full-order-history join and reducing the risk of Supabase statement timeouts on large SQL builds.
 
-Temporal-CV runs, hyperparameters and final selected-model evaluation are tracked with **MLflow**. The selected pipeline is persisted to `models/best_churn_model.joblib` and loaded directly by Streamlit — no separate model-serving API is required. Model selection uses cross-validation PR-AUC; validation selects the F1 threshold; the final test period is evaluated once.
+Temporal-CV runs, hyperparameters and final selected-model evaluation are tracked with **MLflow**. The selected pipeline is persisted to `models/best_churn_model.joblib` and loaded directly by Streamlit — no separate model-serving API is required. Model selection uses cross-validation PR-AUC; validation selects the F1 threshold; the final test period is evaluated once. A 90-day purge prevents training/validation label windows from overlapping the next period.
 
 See [`docs/churn_methodology.md`](docs/churn_methodology.md), [`docs/ml_modeling.md`](docs/ml_modeling.md), and [`docs/model_card.md`](docs/model_card.md) for full details, including known limitations.
 
@@ -332,7 +332,7 @@ brazilian-ecommerce-data-science/
 ├── scripts/                  # CLI entry points (see below)
 ├── docs/                     # data model, methodology, business questions, model card
 ├── data/                     # historical dashboard/scoring datasets used by the deployed demo
-├── models/                   # trained model artifacts (gitignored)
+├── models/                   # deployed model, metadata and model-selection artifacts
 ├── mlflow/                   # local MLflow tracking store
 ├── tests/                    # pytest suite
 └── requirements.txt
@@ -434,6 +434,9 @@ This builds `data/ml/customer_churn_dataset.parquet`, trains and compares the ca
 - `models/model_comparison.csv` — benchmark across model families
 - `models/model_metadata.json` — features, hyperparameters, split dates, test metrics
 - `models/test_predictions.parquet` — final chronological test predictions
+- `models/test_classification_report.json` — thresholded class-level metrics
+- `models/test_confusion_matrix.json` — final holdout confusion matrix
+- `models/test_precision_recall_curve.csv` — final holdout precision-recall curve
 
 ### 8. (Optional) Explore experiments in MLflow
 
