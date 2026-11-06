@@ -17,6 +17,7 @@ EXPECTED_ZERO_CHECKS = (
     "incomplete_label_windows",
     "review_feature_mismatches",
     "invalid_history_feature_rows",
+    "invalid_categorical_feature_rows",
 )
 
 
@@ -131,6 +132,13 @@ def main() -> None:
                  OR orders_prior_180d < 0
                  OR revenue_prior_180d < 0
            ) FROM ml.customer_churn_dataset) AS invalid_history_feature_rows,
+          (SELECT COUNT(*) FILTER (
+              WHERE customer_state IS NULL
+                 OR BTRIM(customer_state) = ''
+                 OR snapshot_month IS NULL
+                 OR snapshot_month < 1
+                 OR snapshot_month > 12
+           ) FROM ml.customer_churn_dataset) AS invalid_categorical_feature_rows,
           (SELECT COUNT(*)
            FROM ml.customer_churn_dataset dataset
            CROSS JOIN source_end
