@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import numpy as np
+from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.linear_model import LogisticRegression
 
 
@@ -15,7 +16,7 @@ def probability_logit(probabilities: np.ndarray, epsilon: float = 1e-6) -> np.nd
     return np.log(values / (1.0 - values)).reshape(-1, 1)
 
 
-class PlattCalibratedChurnClassifier:
+class PlattCalibratedChurnClassifier(ClassifierMixin, BaseEstimator):
     """
     Preserve the training estimator's churn-positive API while calibrating
     P(repeat purchase) with a Platt sigmoid learned from training OOF scores.
