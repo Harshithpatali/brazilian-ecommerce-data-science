@@ -59,3 +59,11 @@ def test_fbeta_rejects_non_positive_beta():
         assert "beta" in str(exc)
     else:
         raise AssertionError("Expected an invalid beta to raise ValueError")
+
+
+
+def test_candidate_models_include_regularized_linear_boosted_and_forest_models():
+    from src.models.train_churn import build_models
+
+    models = build_models()
+    assert {"logistic_regression", "hist_gradient_boosting", "random_forest"} <= set(models)
