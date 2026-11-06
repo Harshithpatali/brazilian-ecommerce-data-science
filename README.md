@@ -241,101 +241,45 @@ sql/
 
 Every script is designed to be **rerunnable against a live database** without manual cleanup — tables are dropped and rebuilt deterministically.
 
-## 🤖 Machine Learning — Customer Churn
+## 🤖 Machine Learning — Second-Purchase Propensity
 
-**Business question:** *Among customers who have already shown engagement (2+ delivered orders), which ones are at risk of making no delivered purchase in the next 90 days?*
+**Business question:** *After a customer's first delivered order, how likely are they to place a second delivered order within the next 90 days?*
 
-### Methodology highlights
+The v5 cohort corrects an earlier modeling-definition issue: starting after the second delivered order predicts a third-or-later purchase. The revised cohort starts after the **first delivered order**, making the target a second-purchase propensity problem.
+
+### Point-in-time population and target
 
 - **Grain:** one row per customer-month prediction snapshot.
-- **Population:** customers who have reached their second delivered order and have at least one order purchased and delivered in the prior 180 days.
-- **Snapshot logic:** monthly snapshots begin after the customer's second delivered order. A snapshot is included only when the full 90-day forward observation window is present. All eligible snapshots remain in the dataset, allowing customers to reactivate after a period of inactivity.
-- **Target:** `churned = 1` when no eventually-delivered order has a purchase timestamp in the half-open interval `[snapshot_date, snapshot_date + 90 days)`. A purchase exactly at the 90-day boundary is outside the window.
-- **Leakage control:** historical orders must be purchased and delivered before the snapshot; review scores are included only when `review_answer_timestamp` is before the snapshot, and multiple review rows are averaged within each order before customer-level aggregation. Future orders are used only to create the target. Snapshots without a complete 90-day future window are excluded.
-- **Features:** 30/90/180-day order and revenue windows, prior-180-day activity, lifetime delivered-order count, customer tenure, average/median interpurchase gaps, gap variability, zero-gap share for simultaneous orders, recency-to-cycle ratio, review score, delivery delay and purchase-frequency trends.
+- **Entry:** the first snapshot is the first day of the month after the customer's first delivered order.
+- **Eligibility:** at least one order must have been purchased and delivered in the prior 180 days.
+- **Target:** \`churned = 0\` when a second delivered purchase occurs in \`[snapshot_date, snapshot_date + 90 days)\`; otherwise \`churned = 1\`. The upper boundary is excluded.
+- **Observation window:** a snapshot is retained only when the complete 90-day forward outcome window is observable.
+- **Reactivation:** all eligible monthly snapshots are retained; a customer can return to the positive class after a previous no-purchase period.
+- **Leakage controls:** purchase and delivery timestamps for predictors must precede the snapshot. Review scores are available only when \`review_answer_timestamp\` precedes the snapshot. Future purchases are used only to construct the label.
+- **Feature set:** 49 point-in-time features: recent and prior purchase activity; lifetime order count, tenure and interpurchase timing; first-order basket value, item/product/category/seller diversity, freight share, payment method and installments; first-order delivery and review experience; and rolling basket/payment behaviour.
 
-### Class imbalance and evaluation target
+### Data-population audit
 
-The rebuilt point-in-time dataset contains **10,570 customer-month snapshots**
-across 2,374 customers. Only **306 snapshots (2.89%)** have a delivered
-purchase in the following 90 days; 10,264 (97.11%) do not. These are full
-dataset counts, not holdout metrics. Because no-purchase is the majority
-class, model selection and PR-AUC focus on the minority event—purchase within
-90 days (`churned = 0`). The model still predicts churn probability; repeat-
-purchase probability is its complement. The validation F2 threshold for
-repeat purchase (beta=2, recall-weighted) is converted to a complementary
-churn-risk cutoff for the dashboard.
+A read-only audit of the connected Olist source found **99,441 source orders**, **96,470 delivered orders** and **93,350 customers with a delivered order**. The first-delivered-order cohort query produced **357,413 eligible customer-month snapshots across 79,594 customers**, including **2,686 second-purchase events (0.752%)**.
 
-### Model comparison
+These are database cohort-audit counts, not final v5 train/validation/test metrics. The automated rebuild checks the resulting extract against minimum row, customer and positive-event counts before training, so a stale second-or-later-purchase dataset or truncated database cannot silently be used.
 
-Two model families are tuned with **expanding-window temporal cross-validation grouped by unique snapshot dates**, a 90-day embargo between fold periods, and GridSearchCV. Model selection optimizes average precision (PR-AUC) for the minority event: a delivered purchase within 90 days (`churned = 0`), not the 97% majority no-purchase class.
+### Model selection and evaluation design
 
-| # | Model | Type | Why it's included |
-|---|---|---|---|
-| 1 | **Logistic Regression** | Linear baseline | Interpretable coefficients, fast, strong sanity-check baseline |
-| 2 | **HistGradientBoosting** | Boosted trees | Captures nonlinear relationships in tabular data |
-| 3 | **Random Forest** | Bagged trees | Tests nonlinear interactions with shallow, regularized trees |
+Three ML candidate families (Logistic Regression, HistGradientBoosting and Random Forest) compete with three point-in-time RFM scorers (recency-only, recent-frequency-only and lifetime-frequency-only). Every candidate is evaluated with the same temporal folds; the selected approach must beat the simple baselines in cross-validation before it is considered useful. Hyperparameters are selected by **expanding-window, date-grouped, 90-day-purged temporal cross-validation**, optimizing average precision for the second-purchase event. A separate chronological validation period is used for model calibration and the operating threshold; the latest chronological holdout is not used for model, calibration or threshold selection.
 
-```mermaid
-flowchart LR
-    A["Point-in-time<br/>churn dataset"] --> B["Chronological split<br/>train / validation / test"]
-    B --> C["Date-grouped expanding-window CV<br/>+ GridSearchCV"]
-    C --> D1[Logistic Regression]
-    C --> D3[HistGradientBoosting]
-    C --> D4[Random Forest]
-    D1 --> E["Select using mean CV PR-AUC for repeat purchase"]
-    D3 --> E
-    D4 --> E
-    E --> V["Choose threshold on validation<br/>by repeat-purchase F2"]
-    V --> T["Evaluate frozen model once<br/>on final chronological test"]
-    T --> G[("models/best_churn_model.joblib")]
-    C -.logged to.-> M[("MLflow<br/>Tracking Server")]
+The v5 evaluation adds the measures needed to judge a campaign-ranking system rather than a single arbitrary classification threshold:
 
-    style A fill:#4c72b0,color:#fff
-    style G fill:#2ea44f,color:#fff
-    style M fill:#0194E2,color:#fff
-```
+- **Ranking:** PR-AUC and ROC-AUC, compared with prior, recency-only, recent-frequency-only and lifetime-frequency-only baselines.
+- **Calibration:** Platt sigmoid calibration fitted on purged out-of-fold training predictions, plus Brier score, log-loss, expected calibration error and reliability bins.
+- **Campaign utility:** precision, recall, captured events and lift when contacting the top 5%, 10% and 20% within each monthly cohort.
+- **Uncertainty:** customer-cluster bootstrap 95% confidence interval for PR-AUC, resampling customers rather than correlated monthly rows.
+- **Generalization:** a separate test subset for customers absent from both training and validation, alongside known-customer future scoring.
+- **Decision policy:** the F2 threshold remains a diagnostic operating point. The dashboard ranks prospects against a monthly contact-capacity setting instead of treating the F2 threshold as a campaign rule.
 
-The performance-optimized build first materializes delivered orders into a compact `ml.delivered_orders` table, aggregates to `ml.customer_monthly_activity`, and only then constructs the point-in-time dataset — avoiding an expensive snapshot × full-order-history join and reducing the risk of Supabase statement timeouts on large SQL builds.
+The final v5 scores will be published only after the complete-data rebuild, integrity checks, automated tests, model-artifact verification and final holdout evaluation succeed. No v5 performance scores are claimed before that run completes.
 
-Temporal-CV runs, hyperparameters and final selected-model evaluation are tracked with **MLflow**. The selected pipeline is persisted to `models/best_churn_model.joblib` and loaded directly by Streamlit — no separate model-serving API is required. Model selection uses cross-validation PR-AUC for repeat purchase within 90 days (the minority event); validation selects its recall-oriented F2 threshold (beta=2); the final test period is evaluated once. The dashboard reports the complementary churn-risk cutoff. Reports include class-specific metrics, balanced accuracy and Matthews correlation coefficient. A 90-day purge prevents training/validation label windows from overlapping the next period.
-
-See [`docs/churn_methodology.md`](docs/churn_methodology.md), [`docs/ml_modeling.md`](docs/ml_modeling.md), and [`docs/model_card.md`](docs/model_card.md) for full details, including known limitations.
-
-### v4 final chronological holdout results
-
-The retrained v4 model selected **HistGradientBoosting** using purged,
-date-grouped CV PR-AUC for repeat purchase. Its mean CV PR-AUC was **0.0945**
-(HistGradientBoosting), versus **0.0672** (Random Forest) and **0.0614**
-(Logistic Regression).
-
-| Final test metric | v4 result |
-|---|---:|
-| Repeat-purchase PR-AUC | **0.0472** |
-| Prior-prevalence dummy PR-AUC | 0.0242 |
-| Repeat-purchase ROC-AUC | 0.6555 |
-| Repeat-purchase precision | 3.62% |
-| Repeat-purchase recall | **65.18%** |
-| Repeat-purchase F1 | 0.0686 |
-| Repeat-purchase F2 | 0.1482 |
-| Balanced accuracy | 61.05% |
-| Matthews correlation | 0.0685 |
-
-The v4 test set contains 4,620 snapshots, including 112 repeat-purchase
-positives (2.42%). At the validation-selected F2 threshold, the confusion
-matrix is 73 true positives, 39 missed repeat purchases, 1,942 false
-positives and 2,566 true negatives. The model flags 2,015 of 4,620 test rows
-(43.6%); only 3.62% of flagged rows are repeat purchasers.
-
-Relative to v3, repeat-purchase recall increased from 7.14% to 65.18%, and
-PR-AUC increased from 0.0377 to 0.0472. Precision declined from 5.84% to
-3.62%. This is a recall-oriented research result, **not a production-ready
-customer targeting rule**. Before campaign use, choose a precision floor or
-customer-contact capacity and select the operating threshold on validation
-data to match that constraint. Do not tune that threshold on the final test.
-
-The v4 dataset and model artifacts are committed in the branch. The Churn
-dashboard now requires a matching `churn-pit-v4` model and metadata contract.
+See [\`docs/churn_methodology.md\`](docs/churn_methodology.md), [\`docs/ml_modeling.md\`](docs/ml_modeling.md) and [\`docs/model_card.md\`](docs/model_card.md) for the protocol and limitations.
 
 ## 📊 Statistical Analysis
 

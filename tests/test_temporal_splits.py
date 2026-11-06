@@ -67,21 +67,23 @@ def test_class_aware_cv_folds_have_both_classes_in_train_and_validation():
 def _realistic_sparse_repeat_purchase_history():
     months = pd.date_range("2016-11-01", "2018-07-01", freq="MS")
     repeat_counts = {
-        "2017-05-01": 3,
-        "2017-06-01": 5,
-        "2017-07-01": 7,
-        "2017-08-01": 11,
-        "2017-09-01": 15,
-        "2017-10-01": 15,
-        "2017-11-01": 21,
-        "2017-12-01": 21,
-        "2018-01-01": 34,
-        "2018-02-01": 30,
-        "2018-03-01": 32,
-        "2018-04-01": 35,
-        "2018-05-01": 31,
-        "2018-06-01": 29,
-        "2018-07-01": 17,
+        "2017-03-01": 13,
+        "2017-04-01": 37,
+        "2017-05-01": 49,
+        "2017-06-01": 75,
+        "2017-07-01": 106,
+        "2017-08-01": 119,
+        "2017-09-01": 167,
+        "2017-10-01": 182,
+        "2017-11-01": 206,
+        "2017-12-01": 187,
+        "2018-01-01": 205,
+        "2018-02-01": 214,
+        "2018-03-01": 241,
+        "2018-04-01": 246,
+        "2018-05-01": 242,
+        "2018-06-01": 235,
+        "2018-07-01": 159,
     }
     dates = []
     labels = []
@@ -119,3 +121,26 @@ def test_sparse_repeat_purchase_history_has_valid_purged_temporal_cv():
         fit_dates = train_dates.iloc[fit_idx]
         fold_validation_dates = train_dates.iloc[validation_idx]
         assert fit_dates.max() + pd.Timedelta(days=90) <= fold_validation_dates.min()
+
+
+
+def test_sparse_repeat_cv_can_require_minimum_positive_event_support():
+    dates, y_churned = _realistic_sparse_repeat_purchase_history()
+    train, _, _, _ = chronological_partition_indices(dates)
+    train_dates = dates.iloc[train].reset_index(drop=True)
+    y_train = y_churned.iloc[train].reset_index(drop=True)
+
+    folds = make_date_grouped_splits(
+        train_dates,
+        y=y_train,
+        n_splits=min(4, train_dates.nunique() - 5),
+        min_train_repeat_events=10,
+        min_validation_repeat_events=5,
+    )
+
+    for fit_idx, validation_idx in folds:
+        assert int((y_train.iloc[fit_idx] == 0).sum()) >= 10
+        assert int((y_train.iloc[validation_idx] == 0).sum()) >= 5
+        fit_dates = train_dates.iloc[fit_idx]
+        validation_dates = train_dates.iloc[validation_idx]
+        assert fit_dates.max() + pd.Timedelta(days=90) <= validation_dates.min()

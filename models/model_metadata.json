@@ -1,33 +1,61 @@
 {
   "pipeline_status": "ready",
-  "model_version": "churn-pit-v4",
-  "experiment_name": "brazilian-ecommerce-churn-v4",
+  "model_version": "churn-pit-v5",
+  "cohort_definition": "Eligible after at least one delivered order; predict the second delivered purchase within the next 90 days.",
+  "experiment_name": "brazilian-ecommerce-churn-v5",
   "tracking_uri": "file:///home/runner/work/brazilian-ecommerce-data-science/brazilian-ecommerce-data-science/mlruns",
-  "selected_model": "hist_gradient_boosting",
-  "selection_metric": "cv_average_precision_for_purchase_within_90_days",
+  "selected_model": "random_forest",
+  "selection_metric": "cv_average_precision_for_second_purchase_within_90_days_against_rfm_baselines",
+  "calibration": {
+    "method": "Platt sigmoid",
+    "fit_source": "purged out-of-fold predictions from training partition only",
+    "training_oof_rows": 54525,
+    "slope": 0.15501324208259415,
+    "intercept": -4.376770538668353
+  },
   "threshold_objective": "F2",
   "threshold_beta": 2.0,
   "best_params": {
-    "model__l2_regularization": 0.0,
-    "model__learning_rate": 0.03,
-    "model__max_iter": 300,
-    "model__max_leaf_nodes": 31,
+    "model__max_depth": null,
+    "model__max_features": "sqrt",
     "model__min_samples_leaf": 20
   },
-  "threshold": 0.9990765283209141,
-  "threshold_selection": "maximum F2 for purchase_within_90_days on separate validation period",
-  "repeat_purchase_probability_threshold": 0.0009234716790860187,
-  "evaluation_positive_class": "purchase_within_90_days (SQL churned=0)",
+  "threshold": 0.9896088147404654,
+  "threshold_selection": "maximum F2 for second_purchase_within_90_days on separate validation period",
+  "repeat_purchase_probability_threshold": 0.010391185259534752,
+  "evaluation_positive_class": "second_purchase_within_90_days (SQL churned=0)",
   "threshold_validation_metrics": {
-    "precision": 0.04753820033955857,
-    "recall": 0.509090909090909,
-    "f1": 0.08695652173913043,
-    "f2": 0.173053152039555,
+    "precision": 0.02219927723283428,
+    "recall": 0.1096938775510204,
+    "f1": 0.0369257191927866,
+    "f2": 0.06134094151212553,
     "beta": 2.0,
-    "repeat_purchase_probability_threshold": 0.0009234716790860187
+    "repeat_purchase_probability_threshold": 0.010391185259534752
   },
-  "target_definition": "1 when no eventually-delivered order has a purchase timestamp in [snapshot_date, snapshot_date + 90 days); otherwise 0.",
+  "target_definition": "1 when no eventually-delivered order has a purchase timestamp in [snapshot_date, snapshot_date + 90 days); otherwise 0. The positive event is the customer's second delivered purchase after cohort entry.",
   "feature_columns": [
+    "first_order_gross_value",
+    "first_order_item_count",
+    "first_order_distinct_products",
+    "first_order_distinct_categories",
+    "first_order_seller_count",
+    "first_order_freight_share",
+    "first_order_max_installments",
+    "first_order_payment_type_count",
+    "first_order_is_credit_card",
+    "first_order_is_boleto",
+    "first_order_is_debit_card",
+    "first_order_is_voucher",
+    "first_order_delivery_days",
+    "first_order_delivery_delay_days",
+    "first_order_approval_lag_hours",
+    "first_order_review_score",
+    "avg_items_per_order_180d",
+    "avg_categories_per_order_180d",
+    "avg_sellers_per_order_180d",
+    "avg_payment_installments_180d",
+    "credit_card_order_share_180d",
+    "avg_freight_share_180d",
     "orders_180d",
     "orders_90d",
     "orders_30d",
@@ -59,6 +87,8 @@
   "feature_availability": {
     "historical_orders": "order_purchase_timestamp < snapshot_date and order_delivered_customer_date < snapshot_date",
     "review_score": "review_answer_timestamp < snapshot_date",
+    "first_order_profile": "first delivered order purchase and delivery timestamps < snapshot_date; review score requires review_answer_timestamp < snapshot_date",
+    "rolling_order_profile": "purchase_timestamp < snapshot_date and delivery_timestamp < snapshot_date within the trailing 180-day feature window",
     "lifetime_history": "purchase_timestamp < snapshot_date and delivered_timestamp < snapshot_date",
     "prior_order_window": "[snapshot_date - 360 days, snapshot_date - 180 days)",
     "future_orders": "used only to construct the target, never as predictors"
@@ -67,7 +97,7 @@
   "max_historical_lookback_days": 360,
   "prediction_window_days": 90,
   "label_horizon_embargo_days": 90,
-  "evaluation_design": "Unique snapshot dates split chronologically into train, validation and final test with a 90-day embargo at period boundaries; CV folds are grouped by unique date and purge overlapping 90-day label windows. Customers can appear in earlier and later periods because the use case is future scoring of known customers.",
+  "evaluation_design": "Known-customer future prediction: unique snapshot dates are split chronologically into train, validation and final test with a 90-day embargo at period boundaries; CV folds are grouped by unique date and purge overlapping 90-day label windows. A separate unseen-customer subset is also reported for customers absent from both train and validation partitions.",
   "periods": {
     "train_start": "2016-11-01",
     "train_end": "2017-09-01",
@@ -77,56 +107,247 @@
     "test_end": "2018-07-01",
     "label_horizon_embargo_days": "90"
   },
+  "customer_overlap": {
+    "train_customers": 20317,
+    "validation_customers": 29015,
+    "test_customers": 54217,
+    "test_customers_seen_in_development": 14573,
+    "test_customers_unseen_in_development": 39644
+  },
   "class_distribution": {
     "all": {
-      "0": 306,
-      "1": 10264
+      "0": 2686,
+      "1": 354727
     },
     "train": {
-      "0": 41,
-      "1": 1461
+      "0": 569,
+      "1": 66995
     },
     "validation": {
-      "0": 55,
-      "1": 1424
+      "0": 392,
+      "1": 47548
     },
     "test": {
-      "0": 112,
-      "1": 4508
+      "0": 882,
+      "1": 142326
     }
   },
   "test_metrics": {
-    "roc_auc": 0.6554607285460767,
-    "pr_auc": 0.04718327498935814,
-    "precision": 0.036228287841191066,
-    "recall": 0.6517857142857143,
-    "f1": 0.0686412787964269,
-    "f2": 0.14819326025172555,
-    "class_0_precision": 0.036228287841191066,
-    "class_0_recall": 0.6517857142857143,
-    "class_0_f1": 0.0686412787964269,
-    "class_1_precision": 0.9850287907869482,
-    "class_1_recall": 0.5692102928127772,
-    "class_1_f1": 0.7214958526641361,
-    "balanced_accuracy": 0.6104980035492458,
-    "matthews_corrcoef": 0.06853998467608126,
-    "positive_prevalence": 0.024242424242424242,
-    "threshold": 0.9990765283209141,
-    "dummy_baseline_pr_auc": 0.024242424242424242,
-    "pr_auc_lift_over_dummy": 0.0229408507469339
+    "roc_auc": 0.5539548899952882,
+    "pr_auc": 0.012670130403375793,
+    "precision": 0.014460700918679823,
+    "recall": 0.0963718820861678,
+    "f1": 0.02514792899408284,
+    "f2": 0.04518392515415692,
+    "class_0_precision": 0.014460700918679823,
+    "class_0_recall": 0.0963718820861678,
+    "class_0_f1": 0.02514792899408284,
+    "class_1_precision": 0.9941964610791524,
+    "class_1_recall": 0.9592976687323469,
+    "class_1_f1": 0.9764353348399463,
+    "balanced_accuracy": 0.5278347754092574,
+    "matthews_corrcoef": 0.02195313917831423,
+    "positive_prevalence": 0.006158873805932629,
+    "threshold": 0.9896088147404654,
+    "brier_score": 0.006125273266540271,
+    "log_loss": 0.0377965458860599,
+    "expected_calibration_error": 0.002803543667709361,
+    "prior_dummy_brier_score": 0.006126062211326088,
+    "prior_dummy_log_loss": 0.03782585269030034,
+    "mean_predicted_repeat_probability": 0.008689282562577715,
+    "predicted_to_observed_rate_ratio": 1.4108557564871083,
+    "dummy_baseline_pr_auc": 0.006158873805932629,
+    "recency_baseline_pr_auc": 0.00792794178145024,
+    "frequency_baseline_pr_auc": 0.008910984292957296,
+    "lifetime_frequency_baseline_pr_auc": 0.01665442870180871,
+    "pr_auc_lift_over_dummy": 0.0065112565974431635
+  },
+  "test_capacity_metrics": {
+    "5%": {
+      "capacity_fraction": 0.05,
+      "monthly_cohorts": 4,
+      "snapshots_scored": 143208,
+      "customers_contacted": 7162,
+      "true_repeat_purchases_captured": 96,
+      "precision": 0.013404077073443172,
+      "recall": 0.10884353741496598,
+      "lift_over_monthly_prevalence": 2.176384432577834,
+      "overall_repeat_purchase_prevalence": 0.006158873805932629
+    },
+    "10%": {
+      "capacity_fraction": 0.1,
+      "monthly_cohorts": 4,
+      "snapshots_scored": 143208,
+      "customers_contacted": 14322,
+      "true_repeat_purchases_captured": 169,
+      "precision": 0.011800027929060188,
+      "recall": 0.19160997732426305,
+      "lift_over_monthly_prevalence": 1.9159392286449561,
+      "overall_repeat_purchase_prevalence": 0.006158873805932629
+    },
+    "20%": {
+      "capacity_fraction": 0.2,
+      "monthly_cohorts": 4,
+      "snapshots_scored": 143208,
+      "customers_contacted": 28643,
+      "true_repeat_purchases_captured": 264,
+      "precision": 0.00921691163635094,
+      "recall": 0.29931972789115646,
+      "lift_over_monthly_prevalence": 1.4965254893634303,
+      "overall_repeat_purchase_prevalence": 0.006158873805932629
+    }
+  },
+  "baseline_capacity_metrics": {
+    "recency_only": {
+      "5%": {
+        "capacity_fraction": 0.05,
+        "monthly_cohorts": 4,
+        "snapshots_scored": 143208,
+        "customers_contacted": 7162,
+        "true_repeat_purchases_captured": 69,
+        "precision": 0.00963418039653728,
+        "recall": 0.0782312925170068,
+        "lift_over_monthly_prevalence": 1.5642763109153184,
+        "overall_repeat_purchase_prevalence": 0.006158873805932629
+      },
+      "10%": {
+        "capacity_fraction": 0.1,
+        "monthly_cohorts": 4,
+        "snapshots_scored": 143208,
+        "customers_contacted": 14322,
+        "true_repeat_purchases_captured": 131,
+        "precision": 0.00914676721128334,
+        "recall": 0.14852607709750568,
+        "lift_over_monthly_prevalence": 1.4851363251626581,
+        "overall_repeat_purchase_prevalence": 0.006158873805932629
+      },
+      "20%": {
+        "capacity_fraction": 0.2,
+        "monthly_cohorts": 4,
+        "snapshots_scored": 143208,
+        "customers_contacted": 28643,
+        "true_repeat_purchases_captured": 247,
+        "precision": 0.008623398387040463,
+        "recall": 0.2800453514739229,
+        "lift_over_monthly_prevalence": 1.400158317699876,
+        "overall_repeat_purchase_prevalence": 0.006158873805932629
+      }
+    },
+    "orders_180d_only": {
+      "5%": {
+        "capacity_fraction": 0.05,
+        "monthly_cohorts": 4,
+        "snapshots_scored": 143208,
+        "customers_contacted": 7162,
+        "true_repeat_purchases_captured": 80,
+        "precision": 0.01117006422786931,
+        "recall": 0.09070294784580499,
+        "lift_over_monthly_prevalence": 1.813653693814862,
+        "overall_repeat_purchase_prevalence": 0.006158873805932629
+      },
+      "10%": {
+        "capacity_fraction": 0.1,
+        "monthly_cohorts": 4,
+        "snapshots_scored": 143208,
+        "customers_contacted": 14322,
+        "true_repeat_purchases_captured": 140,
+        "precision": 0.009775171065493646,
+        "recall": 0.15873015873015872,
+        "lift_over_monthly_prevalence": 1.5871685917768867,
+        "overall_repeat_purchase_prevalence": 0.006158873805932629
+      },
+      "20%": {
+        "capacity_fraction": 0.2,
+        "monthly_cohorts": 4,
+        "snapshots_scored": 143208,
+        "customers_contacted": 28643,
+        "true_repeat_purchases_captured": 212,
+        "precision": 0.007401459344342423,
+        "recall": 0.24036281179138322,
+        "lift_over_monthly_prevalence": 1.2017553172160882,
+        "overall_repeat_purchase_prevalence": 0.006158873805932629
+      }
+    },
+    "lifetime_frequency_only": {
+      "5%": {
+        "capacity_fraction": 0.05,
+        "monthly_cohorts": 4,
+        "snapshots_scored": 143208,
+        "customers_contacted": 7162,
+        "true_repeat_purchases_captured": 121,
+        "precision": 0.016894722144652333,
+        "recall": 0.13718820861678005,
+        "lift_over_monthly_prevalence": 2.743151211894979,
+        "overall_repeat_purchase_prevalence": 0.006158873805932629
+      },
+      "10%": {
+        "capacity_fraction": 0.1,
+        "monthly_cohorts": 4,
+        "snapshots_scored": 143208,
+        "customers_contacted": 14322,
+        "true_repeat_purchases_captured": 173,
+        "precision": 0.012079318530931435,
+        "recall": 0.1961451247165533,
+        "lift_over_monthly_prevalence": 1.9612869026957245,
+        "overall_repeat_purchase_prevalence": 0.006158873805932629
+      },
+      "20%": {
+        "capacity_fraction": 0.2,
+        "monthly_cohorts": 4,
+        "snapshots_scored": 143208,
+        "customers_contacted": 28643,
+        "true_repeat_purchases_captured": 252,
+        "precision": 0.008797961107425898,
+        "recall": 0.2857142857142857,
+        "lift_over_monthly_prevalence": 1.4285016034832745,
+        "overall_repeat_purchase_prevalence": 0.006158873805932629
+      }
+    }
+  },
+  "customer_cluster_bootstrap_pr_auc_ci95": {
+    "lower_95": 0.009483198207788,
+    "upper_95": 0.01835291160994996,
+    "valid_replicates": 200
+  },
+  "unseen_customer_test_metrics": {
+    "rows": 114707,
+    "customers": 39644,
+    "positive_count": 682,
+    "positive_prevalence": 0.0059455830943185685,
+    "pr_auc": 0.009720426009443684,
+    "roc_auc": 0.5199271587943427,
+    "precision_at_10pct_capacity": 0.009239888423988842
+  },
+  "known_customer_test_metrics": {
+    "rows": 28501,
+    "customers": 14573,
+    "positive_count": 200,
+    "positive_prevalence": 0.007017297638679344,
+    "pr_auc": 0.029055939363278716,
+    "roc_auc": 0.6680537790184092,
+    "precision_at_10pct_capacity": 0.019642230796211857
+  },
+  "baseline_metrics": {
+    "prior_dummy_pr_auc": 0.006158873805932629,
+    "recency_only_pr_auc": 0.00792794178145024,
+    "orders_180d_only_pr_auc": 0.008910984292957296,
+    "lifetime_orders_only_pr_auc": 0.01665442870180871
   },
   "dummy_baseline": {
     "strategy": "prior",
-    "test_pr_auc": 0.024242424242424242,
-    "test_positive_prevalence": 0.024242424242424242
+    "test_pr_auc": 0.006158873805932629,
+    "test_positive_prevalence": 0.006158873805932629
   },
-  "model_sha256": "159f86b89934f824fd8d1b1363d19b392dcdbda2d8e744a09d5c03184f680ec7",
+  "model_sha256": "5797b66a7ad44d487d37b19d9281d60418425d14af51448bb8470790ec3bacdf",
   "artifacts": {
     "model": "models/best_churn_model.joblib",
     "comparison": "models/model_comparison.csv",
     "test_predictions": "models/test_predictions.parquet",
     "classification_report": "models/test_classification_report.json",
     "confusion_matrix": "models/test_confusion_matrix.json",
-    "precision_recall_curve": "models/test_precision_recall_curve.csv"
+    "precision_recall_curve": "models/test_precision_recall_curve.csv",
+    "capacity_metrics": "models/test_capacity_metrics.json",
+    "baseline_capacity_metrics": "models/test_baseline_capacity_metrics.json",
+    "calibration_bins": "models/test_calibration_bins.csv"
   }
 }

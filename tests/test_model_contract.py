@@ -9,12 +9,21 @@ def valid_metadata():
         "pipeline_status": "ready",
         "model_version": MODEL_VERSION,
         "feature_columns": FEATURE_COLS,
-        "evaluation_positive_class": "purchase_within_90_days (SQL churned=0)",
-        "threshold_selection": "maximum F2 for purchase_within_90_days on separate validation period",
+        "cohort_definition": "Eligible after at least one delivered order; predict the second delivered purchase within the next 90 days.",
+        "evaluation_positive_class": "second_purchase_within_90_days (SQL churned=0)",
+        "threshold_selection": "maximum F2 for second_purchase_within_90_days on separate validation period",
+        "calibration": {
+            "method": "Platt sigmoid",
+            "fit_source": "purged out-of-fold predictions from training partition only",
+            "slope": 0.8,
+            "intercept": -1.2,
+        },
         "threshold_beta": 2.0,
         "repeat_purchase_probability_threshold": 0.03,
         "feature_availability": {
             "review_score": "review_answer_timestamp < snapshot_date",
+            "first_order_profile": "first delivered order purchase and delivery timestamps < snapshot_date; review score requires review_answer_timestamp < snapshot_date",
+            "rolling_order_profile": "purchase_timestamp < snapshot_date and delivery_timestamp < snapshot_date within the trailing 180-day feature window",
             "lifetime_history": "purchase_timestamp < snapshot_date and delivered_timestamp < snapshot_date",
             "prior_order_window": "[snapshot_date - 360 days, snapshot_date - 180 days)"
         },
@@ -39,7 +48,36 @@ def valid_metadata():
             "threshold": 0.97,
             "dummy_baseline_pr_auc": 0.36363636363636365,
             "pr_auc_lift_over_dummy": 0.26636363636363636,
+            "brier_score": 0.10,
+            "log_loss": 0.42,
+            "expected_calibration_error": 0.03,
+            "recency_baseline_pr_auc": 0.52,
+            "frequency_baseline_pr_auc": 0.55,
+            "lifetime_frequency_baseline_pr_auc": 0.57,
+            "prior_dummy_brier_score": 0.22,
+            "prior_dummy_log_loss": 0.61,
+            "mean_predicted_repeat_probability": 0.34,
+            "predicted_to_observed_rate_ratio": 0.93,
         },
+        "test_capacity_metrics": {
+            "5%": {"precision": 0.60, "recall": 0.10, "lift_over_monthly_prevalence": 1.6},
+            "10%": {"precision": 0.50, "recall": 0.20, "lift_over_monthly_prevalence": 1.3},
+            "20%": {"precision": 0.40, "recall": 0.40, "lift_over_monthly_prevalence": 1.1},
+        },
+        "baseline_capacity_metrics": {
+            baseline: {
+                "5%": {"precision": 0.50, "recall": 0.10, "lift_over_monthly_prevalence": 1.5},
+                "10%": {"precision": 0.45, "recall": 0.20, "lift_over_monthly_prevalence": 1.3},
+                "20%": {"precision": 0.35, "recall": 0.30, "lift_over_monthly_prevalence": 1.1},
+            }
+            for baseline in ("recency_only", "orders_180d_only", "lifetime_frequency_only")
+        },
+        "customer_cluster_bootstrap_pr_auc_ci95": {
+            "lower_95": 0.58, "upper_95": 0.68, "valid_replicates": 200
+        },
+        "known_customer_test_metrics": {"rows": 50, "customers": 30},
+        "unseen_customer_test_metrics": {"rows": 100, "customers": 80},
+        "known_customer_test_metrics": {"rows": 50, "customers": 30},
         "dummy_baseline": {
             "strategy": "prior",
             "test_pr_auc": 0.36363636363636365,
@@ -163,3 +201,27 @@ def test_model_contract_rejects_future_looking_lifetime_feature_definition():
         "all historical and future orders"
     )
     assert any("lifetime history" in error for error in validate_model_metadata(metadata))
+
+
+
+def test_model_contract_requires_baseline_capacity_comparisons():
+    metadata = valid_metadata()
+    metadata.pop("baseline_capacity_metrics")
+    errors = validate_model_metadata(metadata)
+    assert any("baseline_capacity_metrics" in error for error in errors)
+
+
+
+def test_model_contract_rejects_first_order_profile_leakage():
+    metadata = valid_metadata()
+    metadata["feature_availability"]["first_order_profile"] = (
+        "all customer orders including future orders"
+    )
+    assert any("first_order_profile" in error for error in validate_model_metadata(metadata))
+
+
+
+def test_model_contract_requires_known_customer_test_subset():
+    metadata = valid_metadata()
+    metadata.pop("known_customer_test_metrics")
+    assert any("known_customer_test_metrics" in error for error in validate_model_metadata(metadata))

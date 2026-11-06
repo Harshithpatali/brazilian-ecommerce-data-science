@@ -1,0 +1,107 @@
+{
+  "recency_only": {
+    "5%": {
+      "capacity_fraction": 0.05,
+      "monthly_cohorts": 4,
+      "snapshots_scored": 143208,
+      "customers_contacted": 7162,
+      "true_repeat_purchases_captured": 69,
+      "precision": 0.00963418039653728,
+      "recall": 0.0782312925170068,
+      "lift_over_monthly_prevalence": 1.5642763109153184,
+      "overall_repeat_purchase_prevalence": 0.006158873805932629
+    },
+    "10%": {
+      "capacity_fraction": 0.1,
+      "monthly_cohorts": 4,
+      "snapshots_scored": 143208,
+      "customers_contacted": 14322,
+      "true_repeat_purchases_captured": 131,
+      "precision": 0.00914676721128334,
+      "recall": 0.14852607709750568,
+      "lift_over_monthly_prevalence": 1.4851363251626581,
+      "overall_repeat_purchase_prevalence": 0.006158873805932629
+    },
+    "20%": {
+      "capacity_fraction": 0.2,
+      "monthly_cohorts": 4,
+      "snapshots_scored": 143208,
+      "customers_contacted": 28643,
+      "true_repeat_purchases_captured": 247,
+      "precision": 0.008623398387040463,
+      "recall": 0.2800453514739229,
+      "lift_over_monthly_prevalence": 1.400158317699876,
+      "overall_repeat_purchase_prevalence": 0.006158873805932629
+    }
+  },
+  "orders_180d_only": {
+    "5%": {
+      "capacity_fraction": 0.05,
+      "monthly_cohorts": 4,
+      "snapshots_scored": 143208,
+      "customers_contacted": 7162,
+      "true_repeat_purchases_captured": 80,
+      "precision": 0.01117006422786931,
+      "recall": 0.09070294784580499,
+      "lift_over_monthly_prevalence": 1.813653693814862,
+      "overall_repeat_purchase_prevalence": 0.006158873805932629
+    },
+    "10%": {
+      "capacity_fraction": 0.1,
+      "monthly_cohorts": 4,
+      "snapshots_scored": 143208,
+      "customers_contacted": 14322,
+      "true_repeat_purchases_captured": 140,
+      "precision": 0.009775171065493646,
+      "recall": 0.15873015873015872,
+      "lift_over_monthly_prevalence": 1.5871685917768867,
+      "overall_repeat_purchase_prevalence": 0.006158873805932629
+    },
+    "20%": {
+      "capacity_fraction": 0.2,
+      "monthly_cohorts": 4,
+      "snapshots_scored": 143208,
+      "customers_contacted": 28643,
+      "true_repeat_purchases_captured": 212,
+      "precision": 0.007401459344342423,
+      "recall": 0.24036281179138322,
+      "lift_over_monthly_prevalence": 1.2017553172160882,
+      "overall_repeat_purchase_prevalence": 0.006158873805932629
+    }
+  },
+  "lifetime_frequency_only": {
+    "5%": {
+      "capacity_fraction": 0.05,
+      "monthly_cohorts": 4,
+      "snapshots_scored": 143208,
+      "customers_contacted": 7162,
+      "true_repeat_purchases_captured": 121,
+      "precision": 0.016894722144652333,
+      "recall": 0.13718820861678005,
+      "lift_over_monthly_prevalence": 2.743151211894979,
+      "overall_repeat_purchase_prevalence": 0.006158873805932629
+    },
+    "10%": {
+      "capacity_fraction": 0.1,
+      "monthly_cohorts": 4,
+      "snapshots_scored": 143208,
+      "customers_contacted": 14322,
+      "true_repeat_purchases_captured": 173,
+      "precision": 0.012079318530931435,
+      "recall": 0.1961451247165533,
+      "lift_over_monthly_prevalence": 1.9612869026957245,
+      "overall_repeat_purchase_prevalence": 0.006158873805932629
+    },
+    "20%": {
+      "capacity_fraction": 0.2,
+      "monthly_cohorts": 4,
+      "snapshots_scored": 143208,
+      "customers_contacted": 28643,
+      "true_repeat_purchases_captured": 252,
+      "precision": 0.008797961107425898,
+      "recall": 0.2857142857142857,
+      "lift_over_monthly_prevalence": 1.4285016034832745,
+      "overall_repeat_purchase_prevalence": 0.006158873805932629
+    }
+  }
+}

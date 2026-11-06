@@ -50,3 +50,41 @@ def test_history_features_are_restricted_to_orders_observable_before_snapshot():
     assert "orders_prior_180d" in sql
     assert "s.snapshot_date - INTERVAL '360 days'" in sql
     assert "s.snapshot_date - INTERVAL '180 days'" in sql
+
+
+
+def test_v5_cohort_starts_after_first_delivered_order_to_predict_second_purchase():
+    sql = SQL_PATH.read_text(encoding="utf-8")
+    assert "CREATE TABLE ml.first_delivered_orders AS" in sql
+    assert "WHERE delivered_order_number = 1" in sql
+    assert "second_delivered" not in sql
+    assert "after the first delivered order" in sql.lower()
+
+
+
+def test_first_order_profile_and_payment_features_are_built_at_order_grain():
+    sql = SQL_PATH.read_text(encoding="utf-8")
+    assert "CREATE TABLE ml.order_behavior AS" in sql
+    assert "GROUP BY oi.order_id" in sql
+    assert "GROUP BY order_id" in sql
+    assert "first_order_is_credit_card" in sql
+    assert "first_order_max_installments" in sql
+    assert "first_order_distinct_categories" in sql
+    assert "first_order_approval_lag_hours" in sql
+
+
+def test_first_order_review_requires_answer_timestamp_before_snapshot():
+    sql = SQL_PATH.read_text(encoding="utf-8")
+    assert "r.review_answer_timestamp < s.snapshot_date" in sql
+    assert "first_order_review_score" in sql
+    assert "first_order_key.first_order_id" in sql
+
+
+def test_recent_basket_and_payment_features_use_only_pre_snapshot_delivered_orders():
+    sql = SQL_PATH.read_text(encoding="utf-8")
+    profile = sql[sql.index("AS avg_items_per_order_180d")-900:
+                  sql.index(") profile")]
+    assert "d.order_purchase_timestamp < s.snapshot_date" in profile
+    assert "d.order_delivered_customer_date < s.snapshot_date" in profile
+    assert "avg_payment_installments_180d" in profile
+    assert "credit_card_order_share_180d" in profile

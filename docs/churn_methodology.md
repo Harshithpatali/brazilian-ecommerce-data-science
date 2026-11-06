@@ -1,111 +1,136 @@
-# Churn Modeling Methodology
+# Second-Purchase Propensity Methodology
 
 ## Prediction question
 
-At the beginning of a monthly snapshot, among customers with at least two
-previously delivered orders and delivered activity in the prior 180 days, will
-the customer place no order that is eventually delivered during the next 90 days?
+At the beginning of a monthly customer snapshot, after the customer's first
+delivered order, will the customer place a second order that is eventually
+delivered during the following 90 days?
 
-This is a forward-looking 90-day inactivity label, not permanent customer loss.
+This is a second-purchase propensity target, not permanent customer loss.
+The SQL column remains named \`churned\` for compatibility with the project:
+\`churned = 0\` is the positive second-purchase event; \`churned = 1\` means no
+second delivered purchase is observed in the 90-day window.
 
-## Snapshot and eligible population
+## Snapshot eligibility and cohort entry
 
-- Customers enter after their second delivered order has reached the customer.
-- The first snapshot is the first day of the following calendar month.
-- A snapshot is retained only when the customer has at least one order both
-  purchased and delivered during the exact prior 180-day feature window.
-- Monthly snapshots continue after earlier inactivity labels, allowing
-  customers to reactivate.
-- A snapshot is eligible only when the source contains a complete 90-day
-  forward observation window.
+- Customers enter after their **first delivered order** has reached the customer.
+- Their first prediction snapshot is the first day of the following calendar month.
+- A snapshot is retained only when at least one order was both purchased and
+  delivered during the exact prior 180-day feature window.
+- Monthly snapshots continue after earlier no-purchase labels, allowing
+  customers to reactivate and later make a second purchase.
+- A snapshot is retained only when the complete 90-day future outcome window
+  is observable in the source data.
+- The unique grain is \`(customer_unique_id, snapshot_date)\`.
 
 ## Target definition
 
 The SQL target uses the half-open interval
-[snapshot_date, snapshot_date + 90 days).
+\`[snapshot_date, snapshot_date + 90 days)\`.
 
-- churned = 1 when no eventually-delivered order has a purchase timestamp in
-  this interval.
-- churned = 0 when at least one eventually-delivered order was purchased in it.
+- \`churned = 0\` when at least one eventually-delivered order has a purchase
+  timestamp inside this interval. This is the second-purchase event for the
+  first-delivered-order cohort.
+- \`churned = 1\` when no eventually-delivered order has a purchase timestamp
+  inside the interval.
 - A purchase exactly at the 90-day upper boundary is outside the interval.
-- Observation end is based on the latest purchase timestamp across all source
-  orders, not only delivered orders.
-
-Future records create the label only; they are never used as predictors.
+- The observation end is based on the latest purchase timestamp across all
+  source orders, not only delivered orders.
+- Future observations are used only to construct the label, never as predictors.
 
 ## Point-in-time features
 
-For snapshot date t, historical order features use purchase timestamps in
-[t - 180 days, t) and require delivery to have occurred before t. The 90-day
-and 30-day order/revenue counts are nested windows within the 180-day window.
+For snapshot date \(t\), recent order features use purchase timestamps in
+\`[t - 180 days, t)\` and require delivery to have occurred before \(t\).
+The 90-day and 30-day order/revenue counts are nested windows inside the
+180-day window.
 
-Other features include average order value, average delivery delay, active
-purchase months, recency, order/revenue shares, and order-value ratios. The
-prior 180-day window ([t - 360 days, t - 180 days)) measures changes in order
-frequency and revenue. Lifetime features include the delivered-order count,
-customer tenure, and average/median positive interpurchase gaps with gap variability. Orders with an identical purchase timestamp are represented by a zero-gap share instead of forcing undefined gap statistics to zero; undefined positive-gap ratios are imputed during model fitting.
-All lifetime history is restricted to purchases and deliveries completed
-before t. Review scores are included only when the review-answer timestamp
-precedes t, because the score is not observable until the customer submits it.
+Additional features include:
+- prior activity in `[t - 360 days, t - 180 days)`;
+- first-order basket value, item/product/category/seller counts and freight share;
+- first-order payment type, payment installments and credit-card/boleto/debit/voucher indicators;
+- first-order approval lag, delivery duration, delivery delay and review score;
+- rolling 180-day averages for basket size, category/seller diversity, installments, credit-card share and freight share;
+- lifetime delivered-order count and customer tenure;
+- positive interpurchase-gap count, average/median positive gap, gap
+  coefficient of variation, zero-gap share for simultaneous purchase
+  timestamps, and recency relative to the average positive gap;
+- review scores, available only when \`review_answer_timestamp < t\`;
+- order value, delivery delay, active months and recent-vs-prior purchase ratios.
+
+Every historical purchase and delivery used by these features is strictly
+before the snapshot. Two orders with identical purchase timestamps are
+represented by the zero-gap share. Positive-gap statistics remain undefined
+when there is no positive gap; the fitted pipeline imputes them rather than
+inventing a zero-day purchase cycle.
+
+## Data-population audit
+
+A read-only audit of the connected Olist source found 99,441 source orders,
+96,470 delivered orders and 93,350 customers with at least one delivered
+order. The first-delivered-order cohort query produced 357,413 eligible
+customer-month snapshots across 79,594 customers, with 2,686 second-purchase
+events (0.752%).
+
+These are database cohort-audit counts, not final v5 partition or model
+metrics. The automated pipeline requires at least 300,000 rows, 70,000
+customers and 2,000 positive events before training. This guard is designed
+to fail when an old third-or-later-purchase cohort or truncated extract is
+accidentally supplied.
 
 ## Temporal evaluation protocol
 
-Unique snapshot dates are split chronologically into a training period, a separate
-validation period, and the latest 20% final test period. A 90-day embargo is
-applied at each boundary: a training snapshot is retained only when its full
-90-day label window ends on or before the first validation date, and a
-validation snapshot is retained only when its label window ends on or before
-the first final-test date. Dates in the embargo gaps are deliberately excluded.
+- Snapshot dates are split chronologically into training, validation and
+  final test periods.
+- A 90-day embargo separates periods so earlier label windows cannot overlap
+  a later partition.
+- Expanding-window CV splits unique snapshot dates, not individual rows.
+  Customers from one date remain on the same side of a fold.
+- Each CV fold purges training snapshots whose 90-day label windows overlap
+  the validation block.
+- Hyperparameters are selected by mean CV average precision (PR-AUC) for the
+  second-purchase event (\`1 - churned\`).
+- The final chronological test is evaluated once and is not used for model,
+  calibration or threshold selection.
 
-Expanding-window CV folds are created from unique snapshot dates, not rows.
-All customers from one snapshot date are assigned to the same fold side. Each
-fold also purges training snapshots whose 90-day target windows overlap the
-validation block.
-Customers may occur in earlier and later periods; this measures future
-predictions for known customers, matching the intended use case.
+This design measures future predictions for both customers already seen in
+development and customers first observed in the test period. The latter are
+reported separately; they must not be conflated with known-customer
+performance.
 
-The candidate model is selected by mean CV average precision (PR-AUC) for the
-minority event: a delivered purchase within 90 days (SQL `churned = 0`). This
-avoids optimizing PR-AUC for the 97% majority no-purchase class. The threshold
-is selected by maximizing F2 (beta=2) for repeat purchase on the separate
-validation period. This deliberately weights recall more heavily than
-precision; the equivalent complementary churn-probability cutoff is stored
-for risk scoring. Since no business cost matrix is supplied, F2 remains a
-technical proxy rather than a proven profit-maximizing intervention threshold.
+## Probability calibration and campaign ranking
 
-The frozen model and threshold are evaluated once on the final chronological
-holdout. A 90-day embargo separates validation labels from final-test snapshots.
-The holdout is not used for model or threshold selection.
+The estimator is calibrated with a Platt sigmoid fitted on purged
+out-of-fold predictions from the training partition only. Validation selects
+the diagnostic F2 operating threshold. The final test is used to report
+calibration and ranking metrics, never to fit the calibrator or choose a
+threshold.
 
-## Imbalance and baseline reporting
+The evaluation reports:
+- PR-AUC and ROC-AUC versus prior-probability, recency-only,
+  recent-frequency-only and lifetime-frequency-only baselines;
+- precision, recall, F1, F2, balanced accuracy and Matthews correlation;
+- Brier score, log-loss, expected calibration error and calibration bins;
+- monthly top-5%, top-10% and top-20% campaign-capacity precision, recall,
+  captured-event count and lift over monthly prevalence;
+- a customer-cluster bootstrap 95% PR-AUC interval;
+- a separate final-test result for customers absent from both training
+  and validation.
 
-The database rebuild used for this project produced 10,570 customer-month
-snapshots across 2,374 customers and 21 snapshot months. There were 306
-snapshots with a delivered purchase in the following 90 days (2.89%) and
-10,264 without one (97.11%). These counts describe the full rebuilt dataset,
-not the final test-set distribution.
-
-Because no-purchase is the majority class, model selection and PR-AUC focus on
-the minority repeat-purchase event (`1 - churned`). The fitted model still
-outputs `P(churned)`; repeat-purchase probability is its complement. The
-validation repeat-purchase threshold is converted to a complementary churn
-probability cutoff for the dashboard.
-
-Report class counts and prevalence for each partition, average precision for
-repeat purchase, ROC-AUC, per-class precision/recall/F1, balanced accuracy,
-Matthews correlation coefficient, confusion matrix, classification report,
-and a DummyClassifier prior-probability average-precision baseline. Compare
-repeat-purchase PR-AUC with its prevalence baseline, not with the majority
-churn prevalence.
-
-Interpret average precision relative to positive-class prevalence. A high
-PR-AUC alone is not evidence of useful discrimination when positives are common.
+The monthly capacity metrics rank customers within each monthly cohort.
+They are more directly useful for a campaign with finite contact capacity
+than an unrestricted global classification threshold.
 
 ## Limitations
 
-- Evaluation allows customers in earlier training periods to appear in later
-  periods. It is not unseen-customer generalization.
-- Final delivery status is used retrospectively to define delivered events;
-  predictors are restricted to information observable at snapshot time.
-- F2-based threshold selection does not encode intervention economics or the cost of false positives.
-- Olist is a historical dataset, not a live marketplace feed.
+- Olist is a historical marketplace dataset, not a live customer feed.
+- Eventual delivery is used retrospectively to define delivered-purchase
+  events; predictors remain restricted to information observable at snapshot time.
+- The positive event is rare. Report PR-AUC relative to the positive
+  prevalence and include simple recency/frequency baselines.
+- Probability calibration and offline ranking do not prove incremental
+  campaign lift. A randomized retention experiment is required to measure
+  causal impact and return on investment.
+- The F2 threshold is a technical diagnostic, not a business-optimal contact
+  policy. Real deployment needs a campaign budget, intervention cost,
+  minimum precision target and randomized outcome measurement.

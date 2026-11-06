@@ -33,7 +33,7 @@ def test_missing_raw_source_table_columns_are_reported_by_table():
     }
     missing = find_missing_source_columns(available)
     assert set(missing["olist_order_payments"]) == {
-        "order_id", "payment_value"
+        "order_id", "payment_value", "payment_type", "payment_installments"
     }
 
 

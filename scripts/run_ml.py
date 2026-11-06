@@ -14,7 +14,7 @@ def run_module(module: str) -> None:
 if __name__ == "__main__":
     print("1/2 Exporting materialized point-in-time ML dataset...")
     run_module("scripts.build_ml_data")
-    print("2/2 Tuning 2 churn models + tracking runs in MLflow...")
+    print("2/2 Comparing three models, calibrating repeat-purchase probabilities and evaluating campaign capacity...")
     run_module("src.models.train_churn")
     print("\nML pipeline completed.")
     print("Launch MLflow UI with:")

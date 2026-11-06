@@ -67,3 +67,15 @@ def test_candidate_models_include_regularized_linear_boosted_and_forest_models()
 
     models = build_models()
     assert {"logistic_regression", "hist_gradient_boosting", "random_forest"} <= set(models)
+
+
+
+def test_model_search_includes_rfm_baselines_alongside_ml_estimators():
+    from src.models.train_churn import build_models
+
+    models = build_models()
+    assert {
+        "baseline_recency_only",
+        "baseline_recent_frequency_only",
+        "baseline_lifetime_frequency_only",
+    } <= set(models)

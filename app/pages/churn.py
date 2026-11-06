@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from math import ceil
 from pathlib import Path
 
 import joblib
@@ -51,8 +52,8 @@ def load_comparison() -> pd.DataFrame:
 
 def render() -> None:
     hero(
-        "Customer Churn Intelligence",
-        "Historical point-in-time customer scoring using a 90-day forward inactivity target.",
+        "Second-Purchase Propensity Intelligence",
+        "Point-in-time ranking of customers after their first delivered order for a second purchase within 90 days.",
     )
     try:
         metadata = load_metadata()
@@ -113,8 +114,8 @@ def render() -> None:
         st.error(f"Could not score the latest historical snapshot: {exc}")
         return
 
+    latest["repeat_purchase_probability"] = 1.0 - latest["churn_probability"]
     threshold = float(metadata["threshold"])
-    high_risk = latest[latest["churn_probability"] >= threshold].copy()
     st.info(
         "This is a historical Olist dataset demonstration, not a live customer feed. "
         "Predictions refer to the latest snapshot available in the sample data."
@@ -124,8 +125,8 @@ def render() -> None:
     cards = [
         ("Selected Model", metadata.get("selected_model", "N/A"), "Selected by temporal CV repeat-purchase PR-AUC", "blue"),
         ("Latest Snapshot", str(latest_date.date()), "Historical prediction population", "violet"),
-        ("Average Predicted Risk", f"{latest['churn_probability'].mean():.1%}", "Latest snapshot", "teal"),
-        ("Customers Above Threshold", f"{len(high_risk):,}", f"Risk ≥ {threshold:.1%}", "amber"),
+        ("Average Repeat Probability", f"{latest['repeat_purchase_probability'].mean():.2%}", "Latest snapshot", "teal"),
+        ("Eligible Customers", f"{len(latest):,}", "Latest historical cohort", "amber"),
     ]
     for column, (label, value, help_text, accent) in zip(columns, cards):
         with column:
@@ -135,14 +136,15 @@ def render() -> None:
     baseline = metadata.get("dummy_baseline", {})
     section_title(
         "Final chronological test evaluation",
-        "The selected model and F2 threshold were frozen before this final holdout was evaluated.",
+        "The selected model and calibrator were frozen before the final holdout. Campaign capacity metrics rank customers within each monthly cohort.",
     )
     metric_columns = st.columns(4)
     values = [
         ("Repeat-purchase PR-AUC", test_metrics.get("pr_auc"), "Positive class: delivered purchase within 90 days"),
         ("Dummy repeat-purchase PR-AUC", baseline.get("test_pr_auc"), "Prior-probability baseline"),
         ("Repeat-purchase ROC-AUC", test_metrics.get("roc_auc"), "Threshold independent"),
-        ("Repeat-purchase F2", test_metrics.get("f2"), f"Validation-selected F2; churn cutoff {threshold:.3f}"),
+        ("Repeat-purchase F2", test_metrics.get("f2"), "Validation-selected recall/precision trade-off"),
+
     ]
     for column, (label, value, help_text) in zip(metric_columns, values):
         with column:
@@ -173,7 +175,7 @@ def render() -> None:
         use_container_width=True,
         hide_index=True,
     )
-    quality_columns = st.columns(2)
+    quality_columns = st.columns(4)
     with quality_columns[0]:
         metric_card(
             "Balanced accuracy",
@@ -186,9 +188,27 @@ def render() -> None:
             f"{test_metrics['matthews_corrcoef']:.3f}",
             help_text="Correlation-based score using all confusion-matrix cells",
         )
+    with quality_columns[2]:
+        metric_card(
+            "Brier score",
+            f"{test_metrics['brier_score']:.4f}",
+            help_text="Lower is better; probability calibration",
+        )
+    with quality_columns[3]:
+        metric_card(
+            "Expected calibration error",
+            f"{test_metrics['expected_calibration_error']:.4f}",
+            help_text="Lower is better; equal-frequency reliability bins",
+        )
     prevalence = baseline.get("test_positive_prevalence")
     if prevalence is not None:
-        st.caption(f"Test repeat-purchase prevalence (SQL churned=0): {float(prevalence):.1%}. Interpret repeat-purchase PR-AUC relative to this baseline.")
+        st.caption(
+            f"Test second-purchase prevalence: {float(prevalence):.2%}. "
+            f"Mean calibrated predicted probability: "
+            f"{float(test_metrics.get('mean_predicted_repeat_probability', 0.0)):.2%} "
+            f"({float(test_metrics.get('predicted_to_observed_rate_ratio', 0.0)):.2f}x observed rate)."
+        )
+        st.caption("Interpret PR-AUC relative to this rare-event prevalence; accuracy is not a useful standalone metric.")
     if test_metrics.get("pr_auc_lift_over_dummy") is not None:
         st.caption(
             f"PR-AUC lift over the prior-probability baseline: "
@@ -209,8 +229,8 @@ def render() -> None:
         total = class_0 + class_1
         distribution_rows.append({
             "Partition": partition.title(),
-            "Purchase within 90 days (0)": class_0,
-            "No delivered purchase (1)": class_1,
+            "Second purchase within 90 days (0)": class_0,
+            "No second purchase within 90 days (1)": class_1,
             "Churn prevalence": class_1 / total if total else None,
         })
     st.dataframe(
@@ -262,30 +282,95 @@ def render() -> None:
         st.dataframe(comparison[show], use_container_width=True, hide_index=True)
 
     section_title(
-        "Highest-risk customers",
-        "Latest historical snapshot ranked by probability of no delivered purchase in the next 90 days.",
+        "Campaign capacity and ranking quality",
+        "Precision@K and recall@K are measured by ranking customers separately within each monthly holdout cohort.",
     )
-    display_cols = [
-        "customer_unique_id", "churn_probability", "orders_180d", "revenue_180d",
-        "recency_days", "avg_review_score_180d", "avg_delivery_delay_180d",
-    ]
-    shown = high_risk.sort_values("churn_probability", ascending=False)[
-        [c for c in display_cols if c in high_risk.columns]
-    ].head(100).copy()
-    if not shown.empty:
-        shown["churn_probability"] = shown["churn_probability"].map(lambda x: f"{x:.1%}")
-    st.dataframe(shown, use_container_width=True, hide_index=True)
+    capacity = metadata.get("test_capacity_metrics", {})
+    baseline_capacity = metadata.get("baseline_capacity_metrics", {})
+    capacity_rows = []
+    for label in ("5%", "10%", "20%"):
+        values = capacity.get(label, {})
+        row = {
+            "Monthly contact capacity": label,
+            "Model precision": values.get("precision"),
+            "Model recall": values.get("recall"),
+            "Model lift": values.get("lift_over_monthly_prevalence"),
+            "Model contacts": values.get("customers_contacted"),
+        }
+        for baseline_name, display_name in (
+            ("recency_only", "Recency"),
+            ("orders_180d_only", "Recent frequency"),
+            ("lifetime_frequency_only", "Lifetime frequency"),
+        ):
+            row[f"{display_name} precision"] = baseline_capacity.get(
+                baseline_name, {}
+            ).get(label, {}).get("precision")
+        capacity_rows.append(row)
+    st.dataframe(
+        pd.DataFrame(capacity_rows).style.format({
+            "Model precision": "{:.2%}",
+            "Model recall": "{:.2%}",
+            "Model lift": "{:.2f}x",
+            "Recency precision": "{:.2%}",
+            "Recent frequency precision": "{:.2%}",
+            "Lifetime frequency precision": "{:.2%}",
+        }),
+        use_container_width=True,
+        hide_index=True,
+    )
+    ci = metadata.get("customer_cluster_bootstrap_pr_auc_ci95", {})
+    st.caption(
+        "Customer-cluster bootstrap 95% PR-AUC interval: "
+        f"{float(ci.get('lower_95', 0.0)):.4f}–{float(ci.get('upper_95', 0.0)):.4f} "
+        f"({ci.get('valid_replicates', 0)} valid resamples)."
+    )
+    known = metadata.get("known_customer_test_metrics", {})
+    st.caption(
+        "Known-customer test subset: "
+        f"{known.get('customers', 0):,} customers, "
+        f"{known.get('positive_count', 0):,} second purchases; "
+        f"PR-AUC {float(known.get('pr_auc') or 0.0):.4f}."
+    )
+    unseen = metadata.get("unseen_customer_test_metrics", {})
+    st.caption(
+        "Unseen-customer test subset: "
+        f"{unseen.get('customers', 0):,} customers, "
+        f"{unseen.get('positive_count', 0):,} repeat-purchase events; "
+        f"PR-AUC {float(unseen.get('pr_auc') or 0.0):.4f}."
+    )
 
     section_title(
-        "Intervention threshold",
-        "The churn cutoff is the complement of the repeat-purchase probability threshold selected by validation F1. Changing this control only changes the displayed customer count.",
+        "Latest repeat-purchase prospects",
+        "Customers are ranked by calibrated second-purchase probability. A fixed capacity is more actionable than a global F2 threshold.",
     )
-    threshold_view = st.slider(
-        "Churn probability threshold", min_value=0.01, max_value=0.99,
-        value=float(max(0.01, min(0.99, threshold))), step=0.01,
+    capacity_view = st.slider(
+        "Monthly campaign contact capacity",
+        min_value=5, max_value=30, value=10, step=5,
+        format="%d%%",
     )
-    count = int((latest["churn_probability"] >= threshold_view).sum())
-    metric_card("Customers above selected threshold", f"{count:,}", help_text=f"Threshold {threshold_view:.1%}")
+    target_count = max(1, int(ceil(len(latest) * capacity_view / 100.0)))
+    prospects = latest.nlargest(target_count, "repeat_purchase_probability").copy()
+    display_cols = [
+        "customer_unique_id", "repeat_purchase_probability",
+        "lifetime_delivered_orders", "first_order_gross_value",
+        "first_order_item_count", "first_order_max_installments",
+        "first_order_freight_share", "orders_180d", "revenue_180d",
+        "avg_items_per_order_180d", "credit_card_order_share_180d",
+        "recency_days", "avg_review_score_180d", "first_order_review_score",
+        "avg_delivery_delay_180d",
+    ]
+    shown = prospects[
+        [column for column in display_cols if column in prospects.columns]
+    ].copy()
+    if not shown.empty:
+        shown["repeat_purchase_probability"] = shown[
+            "repeat_purchase_probability"
+        ].map(lambda value: f"{value:.2%}")
+    st.caption(
+        f"Showing the top {capacity_view}% of the latest snapshot "
+        f"({target_count:,} prospects). This is a historical demo, not a live customer feed."
+    )
+    st.dataframe(shown, use_container_width=True, hide_index=True)
 
     with st.expander("Evaluation and methodology"):
         st.write(metadata.get("target_definition", ""))
@@ -293,12 +378,13 @@ def render() -> None:
         st.write(f"PR-AUC positive class: {metadata.get('evaluation_positive_class', 'not specified')}")
         st.write(f"Repeat-purchase probability threshold: {metadata.get('repeat_purchase_probability_threshold', 'not available')}")
         st.write(
-            "F2-based threshold selection favors repeat-purchase recall but remains a technical proxy, not a business-optimal "
-            "retention policy until intervention costs and customer value are specified."
+            "The F2 threshold is retained as a diagnostic operating point. For campaigns, use the top-K capacity ranking and agree a contact budget or minimum precision with the business."
         )
         st.json({
             "model_version": metadata.get("model_version"),
             "selected_model": metadata.get("selected_model"),
+            "calibration": metadata.get("calibration", {}),
+            "campaign_capacity_metrics": capacity,
             "threshold": metadata.get("threshold"),
             "periods": metadata.get("periods", {}),
             "class_distribution": metadata.get("class_distribution", {}),
