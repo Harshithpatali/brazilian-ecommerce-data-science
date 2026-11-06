@@ -46,13 +46,19 @@ def validate_model_metadata(metadata: dict[str, Any]) -> list[str]:
         return ["Model metadata must be a JSON object."]
 
     errors: list[str] = []
-    if metadata.get("pipeline_status") != "ready":
-        errors.append("pipeline_status must be 'ready'.")
+    if metadata.get("pipeline_status") not in {"ready", "research_only"}:
+        errors.append("pipeline_status must be 'ready' or 'research_only'.")
     if metadata.get("model_version") != MODEL_VERSION:
         errors.append(
             f"model_version must be {MODEL_VERSION!r}; found "
             f"{metadata.get('model_version')!r}."
         )
+    gate = metadata.get("promotion_gate")
+    if not isinstance(gate, dict) or not isinstance(gate.get("production_eligible"), bool):
+        errors.append("promotion_gate must include a boolean production_eligible value.")
+    elif (metadata.get("pipeline_status") == "ready") != gate["production_eligible"]:
+        errors.append("pipeline_status must agree with promotion_gate.production_eligible.")
+
     if metadata.get("feature_columns") != FEATURE_COLS:
         errors.append("feature_columns do not match the application's feature contract.")
 
