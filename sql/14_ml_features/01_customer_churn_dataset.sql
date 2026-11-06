@@ -185,14 +185,22 @@ CROSS JOIN LATERAL (
       AND d.order_delivered_customer_date < s.snapshot_date
 ) f
 LEFT JOIN LATERAL (
-    SELECT AVG(r.review_score)::numeric AS avg_review_score_180d
+    /* Average reviews per order first, then weight each order equally.
+       Multiple review rows for one order must not dominate this feature. */
+    SELECT AVG(order_review.order_avg_review_score)::numeric
+        AS avg_review_score_180d
     FROM ml.delivered_orders d
-    JOIN ml.review_events r ON r.order_id = d.order_id
+    CROSS JOIN LATERAL (
+        SELECT AVG(r.review_score)::numeric AS order_avg_review_score
+        FROM ml.review_events r
+        WHERE r.order_id = d.order_id
+          AND r.review_creation_date < s.snapshot_date
+    ) order_review
     WHERE d.customer_unique_id = s.customer_unique_id
       AND d.order_purchase_timestamp >= s.snapshot_date - INTERVAL '180 days'
       AND d.order_purchase_timestamp < s.snapshot_date
       AND d.order_delivered_customer_date < s.snapshot_date
-      AND r.review_creation_date < s.snapshot_date
+      AND order_review.order_avg_review_score IS NOT NULL
 ) review ON TRUE
 WHERE f.orders_180d > 0;
 
