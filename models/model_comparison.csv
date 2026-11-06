@@ -3,5 +3,6 @@ random_forest,0.012305536691295974,"{""model__max_depth"": null, ""model__max_fe
 baseline_lifetime_frequency_only,0.01106607732719652,{},False
 baseline_recent_frequency_only,0.010990344510940775,{},False
 baseline_recency_only,0.010729449837143695,{},False
+extra_trees,0.010630053998131297,"{""model__max_depth"": 8, ""model__max_features"": ""sqrt"", ""model__min_samples_leaf"": 50}",False
 hist_gradient_boosting,0.009931861917127706,"{""model__l2_regularization"": 1.0, ""model__learning_rate"": 0.03, ""model__max_iter"": 150, ""model__max_leaf_nodes"": 31, ""model__min_samples_leaf"": 100}",False
-logistic_regression,0.009567250061545076,"{""model__C"": 0.05, ""model__solver"": ""liblinear""}",False
+logistic_regression,0.009567257151381793,"{""model__C"": 0.05, ""model__solver"": ""liblinear""}",False
