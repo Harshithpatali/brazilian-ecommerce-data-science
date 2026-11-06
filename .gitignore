@@ -26,11 +26,10 @@ data/local/
 *.duckdb
 *.sqlite
 
-# Reproducible local evaluation outputs.
-# The small dashboard datasets, historical scoring sample, fitted model,
-# comparison and metadata tracked here are intentional deployment assets.
+# Reproducible local evaluation outputs that are not needed by the deployed app.
 models/test_predictions.parquet
 models/test_classification_report.json
-models/test_confusion_matrix.json
-models/test_precision_recall_curve.csv
 models/*.tmp
+
+# test_confusion_matrix.json and test_precision_recall_curve.csv are intentional
+# dashboard evaluation assets. Keep them trackable so they can be deployed.
