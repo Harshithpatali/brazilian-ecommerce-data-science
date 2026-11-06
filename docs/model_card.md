@@ -70,8 +70,10 @@ diagnostic F2 threshold. The final chronological holdout is evaluated once.
 The v5 report includes ranking and baseline PR-AUC, ROC-AUC, thresholded
 precision/recall/F1/F2, balanced accuracy, Matthews correlation, Brier score,
 log-loss, expected calibration error, top-5/10/20% monthly campaign capacity
-metrics, customer-cluster bootstrap uncertainty, and separate results for
-customers absent from training and validation.
+metrics for both the selected approach and the RFM baselines, customer-cluster
+bootstrap uncertainty, and separate results for customers absent from
+training and validation. The ML model must earn selection against the
+recency-only, recent-frequency-only and lifetime-frequency-only scorers.
 
 ## Limitations
 
