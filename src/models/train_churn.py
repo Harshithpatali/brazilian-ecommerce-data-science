@@ -479,7 +479,6 @@ def main() -> None:
         "best_params": selected_search.best_params_,
         "threshold": threshold,
         "threshold_selection": "maximum F2 for purchase_within_90_days on separate validation period",
-        "threshold_beta": 2.0,
         "repeat_purchase_probability_threshold": repeat_threshold,
         "evaluation_positive_class": "purchase_within_90_days (SQL churned=0)",
         "threshold_validation_metrics": validation_threshold_metrics,
@@ -494,9 +493,14 @@ def main() -> None:
                 "order_delivered_customer_date < snapshot_date"
             ),
             "review_score": "review_answer_timestamp < snapshot_date",
+            "lifetime_history": (
+                "purchase_timestamp < snapshot_date and delivered_timestamp < snapshot_date"
+            ),
+            "prior_order_window": "[snapshot_date - 360 days, snapshot_date - 180 days)",
             "future_orders": "used only to construct the target, never as predictors",
         },
         "feature_window_days": 180,
+        "max_historical_lookback_days": 360,
         "prediction_window_days": 90,
         "label_horizon_embargo_days": 90,
         "evaluation_design": (
