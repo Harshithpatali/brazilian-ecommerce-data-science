@@ -58,6 +58,14 @@ def valid_metadata():
             "10%": {"precision": 0.50, "recall": 0.20, "lift_over_monthly_prevalence": 1.3},
             "20%": {"precision": 0.40, "recall": 0.40, "lift_over_monthly_prevalence": 1.1},
         },
+        "baseline_capacity_metrics": {
+            baseline: {
+                "5%": {"precision": 0.50, "recall": 0.10, "lift_over_monthly_prevalence": 1.5},
+                "10%": {"precision": 0.45, "recall": 0.20, "lift_over_monthly_prevalence": 1.3},
+                "20%": {"precision": 0.35, "recall": 0.30, "lift_over_monthly_prevalence": 1.1},
+            }
+            for baseline in ("recency_only", "orders_180d_only", "lifetime_frequency_only")
+        },
         "customer_cluster_bootstrap_pr_auc_ci95": {
             "lower_95": 0.58, "upper_95": 0.68, "valid_replicates": 200
         },
@@ -185,3 +193,11 @@ def test_model_contract_rejects_future_looking_lifetime_feature_definition():
         "all historical and future orders"
     )
     assert any("lifetime history" in error for error in validate_model_metadata(metadata))
+
+
+
+def test_model_contract_requires_baseline_capacity_comparisons():
+    metadata = valid_metadata()
+    metadata.pop("baseline_capacity_metrics")
+    errors = validate_model_metadata(metadata)
+    assert any("baseline_capacity_metrics" in error for error in errors)
