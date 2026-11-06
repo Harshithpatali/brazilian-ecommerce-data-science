@@ -9,6 +9,7 @@ from src.models.train_churn import (
     customer_bootstrap_capacity_ci,
     customer_bootstrap_pr_auc_ci,
     repeat_purchase_average_precision_scorer,
+    _calibration_table,
 )
 
 
@@ -138,3 +139,32 @@ def test_candidate_models_include_catboost_native_categorical_candidate():
         "random_forest",
         "catboost",
     } <= set(models)
+
+
+
+def test_all_candidate_pipelines_are_sklearn_cloneable():
+    from sklearn.base import clone
+    from src.models.train_churn import build_models
+
+    for pipeline, _ in build_models().values():
+        clone(pipeline)
+
+
+def test_catboost_receives_native_categorical_columns_at_fit_not_constructor():
+    from src.features.churn_features import CATEGORICAL_FEATURE_COLS
+    from src.models.train_churn import build_models
+
+    pipeline, _ = build_models()["catboost"]
+    assert pipeline.named_steps["model"].get_params()["cat_features"] is None
+    assert CATEGORICAL_FEATURE_COLS == ["customer_state", "snapshot_month"]
+
+
+def test_calibration_table_handles_constant_probability_scores():
+    table = _calibration_table(
+        np.array([0, 1, 0, 1, 0, 1]),
+        np.full(6, 0.05),
+    )
+    assert len(table) == 1
+    assert table.loc[0, "customers"] == 6
+    assert table.loc[0, "mean_predicted_probability"] == 0.05
+    assert table.loc[0, "observed_repeat_rate"] == 0.5
