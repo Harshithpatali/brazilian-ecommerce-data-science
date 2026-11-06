@@ -5,6 +5,9 @@ from src.models.model_contract import MODEL_VERSION, validate_model_metadata
 def valid_metadata():
     metrics = {
         "roc_auc": 0.70,
+        "gini": 0.40,
+        "ks_statistic": 0.30,
+        "expected_calibration_error": 0.02,
         "pr_auc": 0.10,
         "precision": 0.10,
         "recall": 0.20,
@@ -94,7 +97,13 @@ def valid_metadata():
         "customer_bootstrap_pr_auc_95_ci": {
             "lower_95": 0.08,
             "upper_95": 0.12,
-            "replicates": 100,
+            "replicates": 500,
+        },
+        "customer_bootstrap_top10_95_ci": {
+            "precision": {"lower_95": 0.08, "upper_95": 0.12, "replicates": 200},
+            "recall": {"lower_95": 0.15, "upper_95": 0.25, "replicates": 200},
+            "lift": {"lower_95": 2.5, "upper_95": 4.0, "replicates": 200},
+            "flagged_fraction": {"lower_95": 0.09, "upper_95": 0.11, "replicates": 200},
         },
         "unique_customers": {
             "all": 300,
@@ -191,3 +200,19 @@ def test_customer_bootstrap_interval_must_be_valid():
 
 def test_capacity_policy_holdout_metrics_do_not_claim_one_global_test_threshold():
     assert "threshold" not in valid_metadata()["test_metrics"]
+
+
+
+def test_v5_requires_campaign_confidence_intervals():
+    metadata = valid_metadata()
+    metadata["customer_bootstrap_top10_95_ci"].pop("precision")
+    assert any(
+        "customer_bootstrap_top10_95_ci.precision" in error
+        for error in validate_model_metadata(metadata)
+    )
+
+
+def test_gini_must_match_valid_range():
+    metadata = valid_metadata()
+    metadata["test_metrics"]["gini"] = 1.2
+    assert any("test_metrics.gini" in error for error in validate_model_metadata(metadata))
