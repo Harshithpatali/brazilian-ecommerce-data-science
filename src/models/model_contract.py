@@ -237,6 +237,9 @@ def validate_model_metadata(metadata: dict[str, Any]) -> list[str]:
             errors.append("Customer-clustered PR-AUC confidence interval must be finite.")
         elif not 0 <= float(lower) <= float(upper) <= 1:
             errors.append("Customer-clustered PR-AUC confidence interval is invalid.")
+        replicates = ci.get("valid_replicates")
+        if not isinstance(replicates, int) or replicates <= 0:
+            errors.append("Customer-clustered PR-AUC interval must have valid bootstrap replicates.")
 
     unseen = metadata.get("unseen_customer_test_metrics")
     if not isinstance(unseen, dict):
