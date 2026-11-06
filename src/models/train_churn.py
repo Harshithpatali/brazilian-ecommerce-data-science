@@ -97,10 +97,11 @@ def chronological_partition_indices(
     ]
     test_dates = unique[test_start_idx:]
 
-    if len(train_dates) < 4 or len(validation_dates) < 2 or len(test_dates) < 2:
+    if len(train_dates) < 7 or len(validation_dates) < 2 or len(test_dates) < 2:
         raise ValueError(
-            "90-day purging leaves too few dates in a partition. Use a longer "
-            "history or reduce snapshot frequency only after reconsidering the target."
+            "90-day purging leaves too few dates for temporal CV, validation, "
+            "or final testing. At least 7 training dates, 2 validation dates, "
+            "and 2 test dates are required. Use a longer observation history."
         )
 
     values = row_dates.to_numpy()
