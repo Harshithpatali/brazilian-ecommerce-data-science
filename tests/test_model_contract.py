@@ -22,6 +22,8 @@ def valid_metadata():
         "repeat_purchase_probability_threshold": 0.03,
         "feature_availability": {
             "review_score": "review_answer_timestamp < snapshot_date",
+            "first_order_profile": "first delivered order purchase and delivery timestamps < snapshot_date; review score requires review_answer_timestamp < snapshot_date",
+            "rolling_order_profile": "purchase_timestamp < snapshot_date and delivery_timestamp < snapshot_date within the trailing 180-day feature window",
             "lifetime_history": "purchase_timestamp < snapshot_date and delivered_timestamp < snapshot_date",
             "prior_order_window": "[snapshot_date - 360 days, snapshot_date - 180 days)"
         },
@@ -201,3 +203,12 @@ def test_model_contract_requires_baseline_capacity_comparisons():
     metadata.pop("baseline_capacity_metrics")
     errors = validate_model_metadata(metadata)
     assert any("baseline_capacity_metrics" in error for error in errors)
+
+
+
+def test_model_contract_rejects_first_order_profile_leakage():
+    metadata = valid_metadata()
+    metadata["feature_availability"]["first_order_profile"] = (
+        "all customer orders including future orders"
+    )
+    assert any("first_order_profile" in error for error in validate_model_metadata(metadata))
