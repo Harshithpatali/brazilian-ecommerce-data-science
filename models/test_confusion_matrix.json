@@ -1,0 +1,17 @@
+{
+  "labels": [
+    "purchase_within_90_days",
+    "churned"
+  ],
+  "matrix": [
+    [
+      8,
+      104
+    ],
+    [
+      129,
+      4379
+    ]
+  ],
+  "threshold": 0.2537247034268006
+}
