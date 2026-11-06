@@ -9,8 +9,15 @@ def valid_metadata():
         "pipeline_status": "ready",
         "model_version": MODEL_VERSION,
         "feature_columns": FEATURE_COLS,
-        "evaluation_positive_class": "purchase_within_90_days (SQL churned=0)",
-        "threshold_selection": "maximum F2 for purchase_within_90_days on separate validation period",
+        "cohort_definition": "Eligible after at least one delivered order; predict the second delivered purchase within the next 90 days.",
+        "evaluation_positive_class": "second_purchase_within_90_days (SQL churned=0)",
+        "threshold_selection": "maximum F2 for second_purchase_within_90_days on separate validation period",
+        "calibration": {
+            "method": "Platt sigmoid",
+            "fit_source": "purged out-of-fold predictions from training partition only",
+            "slope": 0.8,
+            "intercept": -1.2,
+        },
         "threshold_beta": 2.0,
         "repeat_purchase_probability_threshold": 0.03,
         "feature_availability": {
@@ -39,7 +46,22 @@ def valid_metadata():
             "threshold": 0.97,
             "dummy_baseline_pr_auc": 0.36363636363636365,
             "pr_auc_lift_over_dummy": 0.26636363636363636,
+            "brier_score": 0.10,
+            "log_loss": 0.42,
+            "expected_calibration_error": 0.03,
+            "recency_baseline_pr_auc": 0.52,
+            "frequency_baseline_pr_auc": 0.55,
+            "lifetime_frequency_baseline_pr_auc": 0.57,
         },
+        "test_capacity_metrics": {
+            "5%": {"precision": 0.60, "recall": 0.10, "lift_over_monthly_prevalence": 1.6},
+            "10%": {"precision": 0.50, "recall": 0.20, "lift_over_monthly_prevalence": 1.3},
+            "20%": {"precision": 0.40, "recall": 0.40, "lift_over_monthly_prevalence": 1.1},
+        },
+        "customer_cluster_bootstrap_pr_auc_ci95": {
+            "lower_95": 0.58, "upper_95": 0.68, "valid_replicates": 200
+        },
+        "unseen_customer_test_metrics": {"rows": 100, "customers": 80},
         "dummy_baseline": {
             "strategy": "prior",
             "test_pr_auc": 0.36363636363636365,
