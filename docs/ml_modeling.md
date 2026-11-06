@@ -11,13 +11,16 @@ is \`1 - churned\`.
 
 ## Candidate models
 
-1. Logistic Regression — interpretable linear baseline with balanced class weights.
+1. Logistic Regression — interpretable linear candidate with balanced class weights.
 2. HistGradientBoosting — nonlinear boosted-tree candidate for tabular data.
 3. Random Forest — class-balanced bagged-tree candidate.
 
-The candidate with the highest mean purged temporal-CV average precision for
-second purchase is selected. Hyperparameter selection does not use validation
-or final-test scores.
+They compete against three point-in-time univariate RFM scorers:
+recency-only, recent-order-frequency-only and lifetime-order-frequency-only.
+All six candidates use the same purged temporal-CV folds and average-precision
+scorer. A complex model is selected only when it improves on the simple
+behavioral rankings during cross-validation. Validation and final-test scores
+are not used to choose the model family or hyperparameters.
 
 ## Data population
 
@@ -63,7 +66,9 @@ For each monthly test cohort, customers are ranked by calibrated
 second-purchase probability. The evaluation reports:
 - Precision@K and recall@K at top 5%, 10% and 20% monthly contact capacity;
 - number of customers contacted and repeat purchases captured;
-- lift over the cohort's observed repeat-purchase prevalence.
+- lift over the cohort's observed repeat-purchase prevalence;
+- head-to-head precision at each contact capacity versus recency, recent
+  frequency and lifetime frequency baselines.
 
 These metrics answer the practical question: *given a fixed monthly outreach
 budget, how many future second purchases occur among the customers selected?*
