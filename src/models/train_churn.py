@@ -620,7 +620,7 @@ def main() -> None:
                 "model_family": name,
                 "cv": "expanding_window_grouped_by_snapshot_date",
                 "cv_folds": len(folds),
-                "selection_metric": "cv_average_precision_for_second_purchase_within_90_days_against_RFM_baselines",
+                "selection_metric": "cv_average_precision_for_second_purchase_within_90_days_against_rfm_baselines_against_RFM_baselines",
                 "model_version": MODEL_VERSION,
             })
             mlflow.log_params({
@@ -849,7 +849,7 @@ def main() -> None:
         "experiment_name": experiment,
         "tracking_uri": get_tracking_uri(),
         "selected_model": selected_name,
-        "selection_metric": "cv_average_precision_for_second_purchase_within_90_days",
+        "selection_metric": "cv_average_precision_for_second_purchase_within_90_days_against_rfm_baselines",
         "calibration": {
             "method": "Platt sigmoid",
             "fit_source": "purged out-of-fold predictions from training partition only",
@@ -950,7 +950,7 @@ def main() -> None:
     with mlflow.start_run(run_name="final_selected_model_holdout"):
         mlflow.log_params({
             "selected_model": selected_name,
-            "selection_metric": "cv_average_precision_for_second_purchase_within_90_days",
+            "selection_metric": "cv_average_precision_for_second_purchase_within_90_days_against_rfm_baselines",
             "model_version": MODEL_VERSION,
             "threshold": threshold,
             "threshold_selection": "maximum validation F2 for second_purchase_within_90_days",
