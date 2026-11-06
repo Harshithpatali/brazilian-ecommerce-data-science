@@ -27,6 +27,7 @@ from sklearn.preprocessing import StandardScaler
 
 from src.features.churn_features import FEATURE_COLS
 from src.models.model_contract import MODEL_VERSION
+from src.models.baselines import UnivariateRepeatPurchaseBaseline
 from src.models.calibration import (
     PlattCalibratedChurnClassifier,
     fit_platt_calibrator,
@@ -267,7 +268,7 @@ def choose_fbeta_threshold(
     }
 
 
-def build_models() -> dict[str, tuple[Pipeline, dict[str, list[Any]]]]:
+def build_models() -> dict[str, tuple[Any, dict[str, list[Any]]]]:
     numeric = Pipeline([
         ("imputer", SimpleImputer(strategy="median", add_indicator=True)),
         ("scaler", StandardScaler()),
@@ -313,6 +314,26 @@ def build_models() -> dict[str, tuple[Pipeline, dict[str, list[Any]]]]:
                 "model__min_samples_leaf": [20, 50],
                 "model__max_features": ["sqrt"],
             },
+        ),
+        "baseline_recency_only": (
+            UnivariateRepeatPurchaseBaseline(
+                "recency_days", direction="lower", transform="log1p"
+            ),
+            {},
+        ),
+        "baseline_recent_frequency_only": (
+            UnivariateRepeatPurchaseBaseline(
+                "orders_180d", direction="higher", transform="log1p"
+            ),
+            {},
+        ),
+        "baseline_lifetime_frequency_only": (
+            UnivariateRepeatPurchaseBaseline(
+                "lifetime_delivered_orders",
+                direction="higher",
+                transform="log1p",
+            ),
+            {},
         ),
     }
 
@@ -599,7 +620,7 @@ def main() -> None:
                 "model_family": name,
                 "cv": "expanding_window_grouped_by_snapshot_date",
                 "cv_folds": len(folds),
-                "selection_metric": "cv_average_precision_for_second_purchase_within_90_days",
+                "selection_metric": "cv_average_precision_for_second_purchase_within_90_days_against_RFM_baselines",
                 "model_version": MODEL_VERSION,
             })
             mlflow.log_params({
