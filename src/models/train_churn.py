@@ -493,10 +493,10 @@ def _cluster_bootstrap_pr_auc_ci(
 def _ranking_summary(
     y_true: np.ndarray,
     probabilities: np.ndarray,
-) -> dict[str, float | int]:
+) -> dict[str, float | int | None]:
     y = np.asarray(y_true, dtype=int)
     p = np.asarray(probabilities, dtype=float)
-    result: dict[str, float | int] = {
+    result: dict[str, float | int | None] = {
         "rows": int(len(y)),
         "positive_count": int(y.sum()),
         "positive_prevalence": float(y.mean()) if len(y) else 0.0,
@@ -505,8 +505,8 @@ def _ranking_summary(
         result["pr_auc"] = float(average_precision_score(y, p))
         result["roc_auc"] = float(roc_auc_score(y, p))
     else:
-        result["pr_auc"] = float("nan")
-        result["roc_auc"] = float("nan")
+        result["pr_auc"] = None
+        result["roc_auc"] = None
     return result
 
 
@@ -842,7 +842,7 @@ def main() -> None:
             "validation_customers": int(len(validation_customer_ids)),
             "test_customers": int(test_customer_ids.nunique()),
             "test_customers_seen_in_development": int(
-                test_customer_ids.astype(str).isin(development_customer_ids).sum()
+                len(set(test_customer_ids.astype(str)) & development_customer_ids)
             ),
             "test_customers_unseen_in_development": int(
                 test_customer_ids[unseen_mask].nunique()
