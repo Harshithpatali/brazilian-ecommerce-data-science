@@ -519,7 +519,6 @@ def build_models() -> dict[str, tuple[Pipeline, dict[str, list[Any]]]]:
                     loss_function="Logloss",
                     eval_metric="PRAUC",
                     auto_class_weights="Balanced",
-                    cat_features=CATEGORICAL_FEATURE_COLS,
                     random_seed=42,
                     verbose=False,
                     allow_writing_files=False,
@@ -618,7 +617,17 @@ def main() -> None:
                 refit=True,
                 error_score="raise",
             )
-            search.fit(X_train, y_train)
+            if name == "catboost":
+                # CatBoost mutates cat_features during construction, which
+                # breaks sklearn.clone when passed in the constructor.
+                # Supply the named categorical columns at fit time instead.
+                search.fit(
+                    X_train,
+                    y_train,
+                    model__cat_features=CATEGORICAL_FEATURE_COLS,
+                )
+            else:
+                search.fit(X_train, y_train)
             searches[name] = search
             mlflow.log_params({
                 "model_family": name,
