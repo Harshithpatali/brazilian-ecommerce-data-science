@@ -32,7 +32,7 @@ Candidate models: Logistic Regression, HistGradientBoosting, Random Forest and C
 
 The selected model is calibrated with a Platt sigmoid fitted on the separate chronological validation period. The final chronological holdout is reserved for evaluation only.
 
-The operational benchmark is top-10% monthly capacity. Top-5% and top-20% results are also recorded. Evaluation includes PR-AUC, ROC-AUC, prior-prevalence and recency baselines, Brier score, log loss, Brier skill score, calibration deciles, precision, recall, F1, F2, balanced accuracy, Matthews correlation, capacity precision/recall/lift, confusion matrix and a customer-cluster bootstrap 95% PR-AUC interval.
+The operational benchmark is top-10% monthly capacity. Top-5% and top-20% results are also recorded. Evaluation includes PR-AUC, ROC-AUC, Gini, KS, prior-prevalence and recency baselines, Brier score, log loss, Brier skill score, expected calibration error, calibration deciles, precision, recall, F1, F2, balanced accuracy, Matthews correlation, capacity precision/recall/lift, confusion matrix and customer-cluster bootstrap 95% confidence intervals for PR-AUC and top-10% campaign precision/recall/lift.
 
 ## Limitations
 
