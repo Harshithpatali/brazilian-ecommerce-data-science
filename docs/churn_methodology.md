@@ -45,13 +45,17 @@ scores are included only when the review-creation timestamp precedes t.
 
 ## Temporal evaluation protocol
 
-Unique snapshot dates are split chronologically into approximately:
-- 64% training dates for model fitting and temporal CV;
-- 16% validation dates for threshold selection;
-- latest 20% for final holdout evaluation.
+Unique snapshot dates are split chronologically into a training period, a separate
+validation period, and the latest 20% final test period. A 90-day embargo is
+applied at each boundary: a training snapshot is retained only when its full
+90-day label window ends on or before the first validation date, and a
+validation snapshot is retained only when its label window ends on or before
+the first final-test date. Dates in the embargo gaps are deliberately excluded.
 
 Expanding-window CV folds are created from unique snapshot dates, not rows.
-All customers from one snapshot date are assigned to the same fold side.
+All customers from one snapshot date are assigned to the same fold side. Each
+fold also purges training snapshots whose 90-day target windows overlap the
+validation block.
 Customers may occur in earlier and later periods; this measures future
 predictions for known customers, matching the intended use case.
 
@@ -61,7 +65,8 @@ Since no business cost matrix is supplied, this is a technical proxy rather
 than a proven profit-maximizing intervention threshold.
 
 The frozen model and threshold are evaluated once on the final chronological
-holdout. The holdout is not used for model or threshold selection.
+holdout. A 90-day embargo separates validation labels from final-test snapshots.
+The holdout is not used for model or threshold selection.
 
 ## Imbalance and baseline reporting
 
