@@ -51,28 +51,59 @@ def _dates(values: pd.Series | list[Any]) -> pd.Series:
 def chronological_partition_indices(
     snapshot_dates: pd.Series | list[Any],
     test_fraction: float = 0.20,
-    validation_fraction: float = 0.20,
+    validation_start_fraction: float = 0.45,
+    horizon_days: int = 90,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, dict[str, str]]:
-    """Partition whole dates into approximately 64%/16%/20% periods."""
-    if not 0 < test_fraction < 0.5 or not 0 < validation_fraction < 0.5:
-        raise ValueError("Partition fractions must be between 0 and 0.5.")
+    """
+    Split unique dates chronologically and purge target-window overlap.
+
+    A training snapshot is retained only if its full forward label window
+    ends on or before the validation period begins. Validation snapshots are
+    retained only if their full label window ends on or before final test
+    begins. Rows in the embargo gaps are deliberately excluded.
+    """
+    if not 0 < test_fraction < 0.5:
+        raise ValueError("test_fraction must be between 0 and 0.5.")
+    if not 0 < validation_start_fraction < 0.7:
+        raise ValueError("validation_start_fraction must be between 0 and 0.7.")
+    if horizon_days <= 0:
+        raise ValueError("horizon_days must be positive.")
+
     row_dates = _dates(snapshot_dates)
     unique = np.array(sorted(row_dates.unique()))
-    if len(unique) < 10:
-        raise ValueError("At least 10 unique snapshot dates are required for train, validation, CV, and test.")
+    if len(unique) < 12:
+        raise ValueError(
+            "At least 12 unique snapshot dates are required for purged "
+            "train/validation/test periods and temporal CV."
+        )
 
-    test_start = int(np.floor(len(unique) * (1 - test_fraction)))
-    test_start = min(max(test_start, 2), len(unique) - 1)
-    validation_count = max(1, int(np.floor(test_start * validation_fraction)))
-    validation_start = test_start - validation_count
-    if validation_start < 6:
-        raise ValueError("Too few training dates remain for date-grouped temporal CV.")
+    test_start_idx = int(np.floor(len(unique) * (1 - test_fraction)))
+    validation_start_idx = int(np.floor(len(unique) * validation_start_fraction))
+    if validation_start_idx < 4 or test_start_idx - validation_start_idx < 4:
+        raise ValueError(
+            "Not enough unique dates for chronological partitions and 90-day embargo gaps."
+        )
 
-    train_dates = unique[:validation_start]
-    validation_dates = unique[validation_start:test_start]
-    test_dates = unique[test_start:]
+    validation_start_date = pd.Timestamp(unique[validation_start_idx])
+    test_start_date = pd.Timestamp(unique[test_start_idx])
+    horizon = pd.Timedelta(days=horizon_days)
+
+    train_dates = unique[
+        pd.to_datetime(unique) + horizon <= validation_start_date
+    ]
+    validation_dates = unique[
+        (pd.to_datetime(unique) >= validation_start_date)
+        & (pd.to_datetime(unique) + horizon <= test_start_date)
+    ]
+    test_dates = unique[test_start_idx:]
+
+    if len(train_dates) < 4 or len(validation_dates) < 2 or len(test_dates) < 2:
+        raise ValueError(
+            "90-day purging leaves too few dates in a partition. Use a longer "
+            "history or reduce snapshot frequency only after reconsidering the target."
+        )
+
     values = row_dates.to_numpy()
-
     indices = (
         np.flatnonzero(np.isin(values, train_dates)),
         np.flatnonzero(np.isin(values, validation_dates)),
@@ -85,75 +116,85 @@ def chronological_partition_indices(
         "validation_end": str(pd.Timestamp(validation_dates[-1]).date()),
         "test_start": str(pd.Timestamp(test_dates[0]).date()),
         "test_end": str(pd.Timestamp(test_dates[-1]).date()),
+        "label_horizon_embargo_days": str(horizon_days),
     }
     return *indices, periods
-
 
 def make_date_grouped_splits(
     snapshot_dates: pd.Series | list[Any],
     y: pd.Series | np.ndarray | None = None,
     n_splits: int = 4,
+    horizon_days: int = 90,
 ) -> list[tuple[np.ndarray, np.ndarray]]:
     """
-    Build expanding-window folds over unique dates.
+    Build expanding-window folds over unique dates with a purged label gap.
 
-    When labels are supplied, shorten the fold count or extend the initial
-    training window until every training and validation fold contains both
-    classes. This avoids misleading AP scores from single-class time blocks.
+    The latest training snapshot in a fold must have its full forward target
+    window observed by the first validation snapshot. If labels are supplied,
+    reduce fold count/adjust the warm-up until every side contains both classes.
     """
+    if horizon_days <= 0:
+        raise ValueError("horizon_days must be positive.")
     row_dates = _dates(snapshot_dates)
     unique = np.array(sorted(row_dates.unique()))
-    if n_splits < 2 or len(unique) < n_splits + 4:
-        raise ValueError("Not enough unique dates for temporal CV.")
+    if n_splits < 2 or len(unique) < n_splits + 5:
+        raise ValueError("Not enough unique dates for purged temporal CV.")
 
     values = row_dates.to_numpy()
     labels = None if y is None else np.asarray(pd.Series(y).reset_index(drop=True))
     if labels is not None and len(labels) != len(values):
         raise ValueError("y and snapshot_dates must have the same number of rows.")
 
-    if labels is None:
-        splitter = TimeSeriesSplit(n_splits=n_splits)
-        folds = []
-        for train_date_idx, valid_date_idx in splitter.split(unique):
-            train_dates = unique[train_date_idx]
-            valid_dates = unique[valid_date_idx]
-            folds.append((
-                np.flatnonzero(np.isin(values, train_dates)),
-                np.flatnonzero(np.isin(values, valid_dates)),
-            ))
-        return folds
+    horizon = pd.Timedelta(days=horizon_days)
+    minimum_warmup = max(5, int(np.ceil(len(unique) * 0.25)))
 
-    minimum_warmup = max(4, int(np.ceil(len(unique) * 0.25)))
     for fold_count in range(min(n_splits, len(unique) - minimum_warmup), 1, -1):
         for warmup_end in range(minimum_warmup, len(unique) - fold_count + 1):
             remaining_dates = unique[warmup_end:]
-            blocks = [block for block in np.array_split(remaining_dates, fold_count) if len(block)]
+            blocks = [
+                block for block in np.array_split(remaining_dates, fold_count)
+                if len(block)
+            ]
             if len(blocks) != fold_count:
                 continue
 
             candidate_folds = []
             valid_candidate = True
             for block in blocks:
-                training_dates = unique[unique < block[0]]
-                training_idx = np.flatnonzero(np.isin(values, training_dates))
-                validation_idx = np.flatnonzero(np.isin(values, block))
-                if len(np.unique(labels[training_idx])) != 2:
+                validation_start = pd.Timestamp(block[0])
+                fit_dates = unique[
+                    pd.to_datetime(unique) + horizon <= validation_start
+                ]
+                validation_dates = block
+
+                # Only use fitting dates that precede this block, not any later
+                # dates that happen to be in the complete training partition.
+                fit_dates = fit_dates[fit_dates < validation_start]
+                fit_idx = np.flatnonzero(np.isin(values, fit_dates))
+                validation_idx = np.flatnonzero(
+                    np.isin(values, validation_dates)
+                )
+
+                if len(fit_idx) == 0 or len(validation_idx) == 0:
                     valid_candidate = False
                     break
-                if len(np.unique(labels[validation_idx])) != 2:
-                    valid_candidate = False
-                    break
-                candidate_folds.append((training_idx, validation_idx))
+                if labels is not None:
+                    if len(np.unique(labels[fit_idx])) != 2:
+                        valid_candidate = False
+                        break
+                    if len(np.unique(labels[validation_idx])) != 2:
+                        valid_candidate = False
+                        break
+                candidate_folds.append((fit_idx, validation_idx))
 
             if valid_candidate:
                 return candidate_folds
 
     raise ValueError(
-        "Could not create at least two chronological CV folds containing both "
-        "classes in training and validation. Inspect class prevalence by month "
-        "or collect a longer observation period."
+        "Could not create at least two purged chronological CV folds containing "
+        "both classes in training and validation. Inspect monthly class prevalence "
+        "or use a longer observation history."
     )
-
 
 def choose_f1_threshold(
     y_true: pd.Series | np.ndarray, probabilities: np.ndarray
@@ -262,7 +303,7 @@ def main() -> None:
 
     train_dates = df["snapshot_date"].iloc[train_idx].reset_index(drop=True)
     n_dates = int(train_dates.dt.normalize().nunique())
-    folds = make_date_grouped_splits(train_dates, y=y_train, n_splits=min(4, n_dates - 4))
+    folds = make_date_grouped_splits(train_dates, y=y_train, n_splits=min(4, n_dates - 5))
 
     experiment = configure_mlflow()
     searches: dict[str, GridSearchCV] = {}
