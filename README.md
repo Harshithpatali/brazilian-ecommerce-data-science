@@ -241,45 +241,56 @@ sql/
 
 Every script is designed to be **rerunnable against a live database** without manual cleanup — tables are dropped and rebuilt deterministically.
 
-## 🤖 Machine Learning — Second-Purchase Propensity
+## 🤖 Machine Learning — Second-Purchase Propensity Intelligence
 
-**Business question:** *After a customer's first delivered order, how likely are they to place a second delivered order within the next 90 days?*
+**Business question:** After a customer's first delivered order, how likely are they to place a second delivered order within the next 90 days, and which customers should receive limited campaign capacity?
 
-The v6 cohort corrects an earlier modeling-definition issue: starting after the second delivered order predicts a third-or-later purchase. The revised cohort starts after the **first delivered order**, making the target a second-purchase propensity problem.
+### Cohort and target
 
-### Point-in-time population and target
+- **Grain:** one row per customer-month snapshot, keyed by `customer_unique_id` and `snapshot_date`.
+- **Entry:** customers become eligible after their first delivered order.
+- **Positive event:** a subsequent delivered purchase in `[snapshot_date, snapshot_date + 90 days)`.
+- **Label encoding:** SQL `churned=0` means a second delivered purchase; `churned=1` means no delivered purchase in the horizon. The model's user-facing probability is inverted accordingly.
+- **Outcome completeness:** snapshots are included only when the full 90-day label window is observable.
 
-- **Grain:** one row per customer-month prediction snapshot.
-- **Entry:** the first snapshot is the first day of the month after the customer's first delivered order.
-- **Eligibility:** at least one order must have been purchased and delivered in the prior 180 days.
-- **Target:** \`churned = 0\` when a second delivered purchase occurs in \`[snapshot_date, snapshot_date + 90 days)\`; otherwise \`churned = 1\`. The upper boundary is excluded.
-- **Observation window:** a snapshot is retained only when the complete 90-day forward outcome window is observable.
-- **Reactivation:** all eligible monthly snapshots are retained; a customer can return to the positive class after a previous no-purchase period.
-- **Leakage controls:** purchase and delivery timestamps for predictors must precede the snapshot. Review scores are available only when \`review_answer_timestamp\` precedes the snapshot. Future purchases are used only to construct the label.
-- **Feature set:** 49 point-in-time features: recent and prior purchase activity; lifetime order count, tenure and interpurchase timing; first-order basket value, item/product/category/seller diversity, freight share, payment method and installments; first-order delivery and review experience; and rolling basket/payment behaviour.
+This is a **second-purchase propensity** problem, not conventional subscription churn. All eligible customer-month snapshots are retained, so a customer can re-enter the positive class after a previous no-purchase period.
 
-### Data-population audit
+### Point-in-time feature engineering
 
-A read-only audit of the connected Olist source found **99,441 source orders**, **96,470 delivered orders** and **93,350 customers with a delivered order**. The first-delivered-order cohort query produced **357,413 eligible customer-month snapshots across 79,594 customers**, including **2,686 second-purchase events (0.752%)**.
+The v6 feature contract contains **57 features**:
 
-These are database cohort-audit counts, not final v6 train/validation/test metrics. The automated rebuild checks the resulting extract against minimum row, customer and positive-event counts before training, so a stale second-or-later-purchase dataset or truncated database cannot silently be used.
+- First delivered-order profile: basket value, item/product/category/seller counts, freight share, payment methods/installments, delivery experience, and review information available before the snapshot.
+- Rolling 180-day behaviour: order frequency, product diversity, category preference entropy, dominant category share, seller concentration (HHI and top-seller share), payment diversity, installment share, credit-card share, and freight share.
+- Purchase-cycle behaviour: interpurchase gaps, variability, recency relative to expected cycle, and recent-versus-prior activity.
+- Monetary and engagement behaviour: revenue, average order value, review score, delivery delay, active months, and revenue per order.
 
-### Model selection and evaluation design
+Feature availability is enforced in SQL: purchase and delivery timestamps must precede the snapshot; review features require `review_answer_timestamp < snapshot_date`. Database validation checks target recomputation, snapshot uniqueness, full label windows, feature bounds, first-order profile timing, and review timing.
 
-Three ML candidate families (Logistic Regression, HistGradientBoosting and Random Forest) compete with three point-in-time RFM scorers (recency-only, recent-frequency-only and lifetime-frequency-only). Every candidate is evaluated with the same temporal folds; the selected approach must beat the simple baselines in cross-validation before it is considered useful. Hyperparameters are selected by **expanding-window, date-grouped, 90-day-purged temporal cross-validation**, optimizing average precision for the second-purchase event. A separate chronological validation period is used for model calibration and the operating threshold; the latest chronological holdout is not used for model, calibration or threshold selection.
+### Model competition and validation
 
-The v6 evaluation adds the measures needed to judge a campaign-ranking system rather than a single arbitrary classification threshold:
+Candidates include Logistic Regression, Random Forest, Extra Trees, HistGradientBoosting, XGBoost, CatBoost, and LightGBM when installed. They compete against prior-probability, recency-only, recent-frequency-only, and lifetime-frequency baselines.
 
-- **Ranking:** PR-AUC and ROC-AUC, compared with prior, recency-only, recent-frequency-only and lifetime-frequency-only baselines.
-- **Calibration:** Platt sigmoid calibration fitted on purged out-of-fold training predictions, plus Brier score, log-loss, expected calibration error and reliability bins.
-- **Campaign utility:** precision, recall, captured events and lift when contacting the top 5%, 10% and 20% within each monthly cohort.
-- **Uncertainty:** customer-cluster bootstrap 95% confidence interval for PR-AUC, resampling customers rather than correlated monthly rows.
-- **Generalization:** a separate test subset for customers absent from both training and validation, alongside known-customer future scoring.
-- **Decision policy:** the F2 threshold remains a diagnostic operating point. The dashboard ranks prospects against a monthly contact-capacity setting instead of treating the F2 threshold as a campaign rule.
+- **Temporal design:** chronological train, validation, and final holdout periods with a 90-day purge between periods.
+- **Cross-validation:** expanding-window folds grouped by snapshot date; a date's rows remain together.
+- **Selection metric:** average precision / PR-AUC for the rare second-purchase event.
+- **Calibration:** Platt sigmoid fitted on purged out-of-fold predictions from training only.
+- **Threshold:** F2 selected on the separate validation period; the final test remains untouched.
+- **Generalization:** known-customer and unseen-customer holdout slices.
+- **Uncertainty:** customer-clustered bootstrap interval for holdout PR-AUC.
 
-The final v6 scores will be published only after the complete-data rebuild, integrity checks, automated tests, model-artifact verification and final holdout evaluation succeed. No v6 performance scores are claimed before that run completes.
+### Business-oriented evaluation
 
-See [\`docs/churn_methodology.md\`](docs/churn_methodology.md), [\`docs/ml_modeling.md\`](docs/ml_modeling.md) and [\`docs/model_card.md\`](docs/model_card.md) for the protocol and limitations.
+The dashboard reports PR-AUC and ROC-AUC alongside prevalence, per-class precision/recall/F1, F2, balanced accuracy, MCC, Brier score, log loss, and calibration error. Campaign metrics rank customers within each monthly cohort and report precision, recall, captured repeat purchases, and lift at **5%, 10%, and 20% contact capacity**.
+
+**Promotion gate:** a model is marked production-eligible only if it beats the lifetime-frequency baseline on untouched holdout PR-AUC and precision at all three contact capacities. Otherwise, its metadata is `research_only`, and the dashboard warns against production targeting. A high CV score alone is not sufficient.
+
+### Current v6 status
+
+The v6 feature schema, SQL feature generation, model promotion gate, feature-importance export, and contract tests have been updated. The final v6 metrics must come from a successful full database rebuild and training run; earlier v5 scores must not be presented as v6 results.
+
+See [Interview Guide](docs/INTERVIEW_GUIDE.md), [Model Card](docs/MODEL_CARD.md), [Churn Methodology](docs/churn_methodology.md), and [ML Modeling](docs/ml_modeling.md) for the full technical walkthrough, validation policy, and limitations.
+
+---
 
 ## 📊 Statistical Analysis
 
@@ -299,7 +310,7 @@ Analysis follows good statistical practice: hypotheses are defined before inspec
 | Data access | SQLAlchemy, psycopg 3 |
 | Data wrangling | pandas, numpy, pyarrow |
 | Statistics | scipy |
-| Machine learning | scikit-learn |
+| Machine learning | scikit-learn, XGBoost, CatBoost, LightGBM |
 | Experiment tracking | MLflow |
 | Dashboard / app | Streamlit, Plotly, Matplotlib |
 | Testing | pytest |
