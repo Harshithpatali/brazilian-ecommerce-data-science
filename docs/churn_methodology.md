@@ -59,12 +59,12 @@ The operational decision is capacity-based, not a global probability cutoff. For
 
 The final holdout reports:
 
-- PR-AUC and ROC-AUC for repeat purchase.
+- PR-AUC and ROC-AUC for repeat purchase, plus Gini and Kolmogorov–Smirnov (KS) separation.
 - A training-prevalence prior baseline and a recency-only ranking baseline.
-- Brier score, log loss, Brier skill score and probability-calibration deciles.
+- Brier score, log loss, Brier skill score, expected calibration error and probability-calibration deciles.
 - Precision, recall, F1, F2, balanced accuracy and Matthews correlation under the capacity policy.
 - Precision, recall, lift and contacted share at top 5%, 10% and 20% monthly capacity.
-- A 95% customer-cluster bootstrap interval for PR-AUC.
+- 95% customer-cluster bootstrap intervals for PR-AUC and top-10% campaign precision, recall and lift.
 - Class distributions, split dates, model comparison, holdout predictions and confusion matrix.
 
 PR-AUC must be interpreted relative to repeat-purchase prevalence. A ranking model should also be compared with the simple recency baseline; beating a constant prior alone is not enough evidence of useful customer ranking.
