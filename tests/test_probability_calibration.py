@@ -52,8 +52,10 @@ def test_monthly_capacity_metrics_rank_within_each_snapshot_cohort():
         ["2018-01-01"] * 10 + ["2018-02-01"] * 10
     )
     y = np.array([1] + [0] * 9 + [1] + [0] * 9)
-    scores = np.array([0.99] + list(np.linspace(0.1, 0.01, 9))
-                      + [0.98] + list(np.linspace(0.2, 0.02, 9))
+    scores = np.array(
+        [0.99] + list(np.linspace(0.1, 0.01, 9))
+        + [0.98] + list(np.linspace(0.2, 0.02, 9))
+    )
 
     result = _monthly_capacity_metrics(y, scores, dates, 0.10)
 
