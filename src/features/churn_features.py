@@ -10,6 +10,8 @@ FEATURE_COLS = [
     "orders_prior_180d",
     "lifetime_delivered_orders",
     "customer_tenure_days",
+    "positive_interpurchase_gap_count",
+    "zero_interpurchase_gap_share",
     "avg_interpurchase_days",
     "median_interpurchase_days",
     "interpurchase_gap_cv",
