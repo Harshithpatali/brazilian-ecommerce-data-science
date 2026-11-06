@@ -198,11 +198,17 @@ def render() -> None:
         metric_card(
             "Expected calibration error",
             f"{test_metrics['expected_calibration_error']:.4f}",
-            help_text="Lower is better; 10 equal-width probability bins",
+            help_text="Lower is better; equal-frequency reliability bins",
         )
     prevalence = baseline.get("test_positive_prevalence")
     if prevalence is not None:
-        st.caption(f"Test repeat-purchase prevalence (SQL churned=0): {float(prevalence):.1%}. Interpret repeat-purchase PR-AUC relative to this baseline.")
+        st.caption(
+            f"Test second-purchase prevalence: {float(prevalence):.2%}. "
+            f"Mean calibrated predicted probability: "
+            f"{float(test_metrics.get('mean_predicted_repeat_probability', 0.0)):.2%} "
+            f"({float(test_metrics.get('predicted_to_observed_rate_ratio', 0.0)):.2f}x observed rate)."
+        )
+        st.caption("Interpret PR-AUC relative to this rare-event prevalence; accuracy is not a useful standalone metric.")
     if test_metrics.get("pr_auc_lift_over_dummy") is not None:
         st.caption(
             f"PR-AUC lift over the prior-probability baseline: "
@@ -223,8 +229,8 @@ def render() -> None:
         total = class_0 + class_1
         distribution_rows.append({
             "Partition": partition.title(),
-            "Purchase within 90 days (0)": class_0,
-            "No delivered purchase (1)": class_1,
+            "Second purchase within 90 days (0)": class_0,
+            "No second purchase within 90 days (1)": class_1,
             "Churn prevalence": class_1 / total if total else None,
         })
     st.dataframe(
@@ -317,6 +323,13 @@ def render() -> None:
         "Customer-cluster bootstrap 95% PR-AUC interval: "
         f"{float(ci.get('lower_95', 0.0)):.4f}–{float(ci.get('upper_95', 0.0)):.4f} "
         f"({ci.get('valid_replicates', 0)} valid resamples)."
+    )
+    known = metadata.get("known_customer_test_metrics", {})
+    st.caption(
+        "Known-customer test subset: "
+        f"{known.get('customers', 0):,} customers, "
+        f"{known.get('positive_count', 0):,} second purchases; "
+        f"PR-AUC {float(known.get('pr_auc') or 0.0):.4f}."
     )
     unseen = metadata.get("unseen_customer_test_metrics", {})
     st.caption(
