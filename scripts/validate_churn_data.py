@@ -102,8 +102,13 @@ def main() -> None:
               WHERE lifetime_delivered_orders < orders_180d
                  OR customer_tenure_days < recency_days
                  OR customer_tenure_days < 0
+                 OR avg_interpurchase_days IS NULL
                  OR avg_interpurchase_days <= 0
+                 OR median_interpurchase_days IS NULL
                  OR median_interpurchase_days <= 0
+                 OR interpurchase_gap_cv IS NULL
+                 OR interpurchase_gap_cv < 0
+                 OR recency_to_avg_interpurchase_ratio IS NULL
                  OR recency_to_avg_interpurchase_ratio < 0
                  OR orders_prior_180d < 0
                  OR revenue_prior_180d < 0
