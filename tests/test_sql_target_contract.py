@@ -19,7 +19,7 @@ def test_sql_uses_half_open_90_day_target_window():
 def test_sql_features_require_delivery_before_snapshot():
     sql = SQL_PATH.read_text(encoding="utf-8")
     assert "d.order_delivered_customer_date < s.snapshot_date" in sql
-    assert "r.review_creation_date < s.snapshot_date" in sql
+    assert "r.review_answer_timestamp < s.snapshot_date" in sql
 
 
 def test_sql_requires_full_future_observation_window():
