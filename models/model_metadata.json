@@ -1,5 +1,5 @@
 {
   "pipeline_status": "stale_requires_retraining",
-  "model_version": "legacy-before-churn-pit-v2",
+  "model_version": "legacy-before-churn-pit-v3",
   "note": "This checked-in model metadata and binary were produced before the point-in-time target and date-grouped temporal evaluation corrections. Rebuild the SQL dataset and run scripts.run_ml to generate validated artifacts. The dashboard intentionally refuses to serve this legacy model."
 }
