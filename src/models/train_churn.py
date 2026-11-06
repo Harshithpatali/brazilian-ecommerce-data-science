@@ -489,7 +489,7 @@ def main() -> None:
         "dummy_baseline": {
             "strategy": "prior",
             "test_pr_auc": dummy_pr_auc,
-            "test_positive_prevalence": float(y_test.mean()),
+            "test_positive_prevalence": float(y_test_repeat.mean()),
         },
         "model_sha256": hashlib.sha256(model_path.read_bytes()).hexdigest(),
         "artifacts": {
