@@ -122,6 +122,8 @@ SELECT
     prior.orders_prior_180d,
     history.lifetime_delivered_orders,
     history.customer_tenure_days,
+    history.positive_interpurchase_gap_count,
+    history.zero_interpurchase_gap_share,
     history.avg_interpurchase_days,
     history.median_interpurchase_days,
     history.interpurchase_gap_cv,
@@ -214,11 +216,23 @@ LEFT JOIN LATERAL (
         COUNT(*)::integer AS lifetime_delivered_orders,
         (s.snapshot_date - MIN(history.first_purchase_date))::integer
             AS customer_tenure_days,
-        AVG(history.gap_days)::numeric AS avg_interpurchase_days,
-        percentile_cont(0.5) WITHIN GROUP (ORDER BY history.gap_days)::numeric
+        COUNT(history.gap_days) FILTER (WHERE history.gap_days > 0)::integer
+            AS positive_interpurchase_gap_count,
+        COALESCE(
+            COUNT(*) FILTER (WHERE history.gap_days = 0)::numeric
+            / NULLIF(COUNT(history.gap_days), 0),
+            0
+        ) AS zero_interpurchase_gap_share,
+        AVG(history.gap_days) FILTER (WHERE history.gap_days > 0)::numeric
+            AS avg_interpurchase_days,
+        percentile_cont(0.5) WITHIN GROUP (ORDER BY history.gap_days)
+            FILTER (WHERE history.gap_days > 0)::numeric
             AS median_interpurchase_days,
-        STDDEV_POP(history.gap_days)::numeric
-            / NULLIF(AVG(history.gap_days), 0) AS interpurchase_gap_cv,
+        STDDEV_POP(history.gap_days) FILTER (WHERE history.gap_days > 0)::numeric
+            / NULLIF(
+                AVG(history.gap_days) FILTER (WHERE history.gap_days > 0),
+                0
+            ) AS interpurchase_gap_cv,
         (s.snapshot_date - MAX(history.purchase_date))::integer AS recency_days
     FROM (
         SELECT
