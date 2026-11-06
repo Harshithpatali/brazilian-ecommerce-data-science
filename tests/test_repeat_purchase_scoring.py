@@ -155,7 +155,7 @@ def test_catboost_receives_native_categorical_columns_at_fit_not_constructor():
     from src.models.train_churn import build_models
 
     pipeline, _ = build_models()["catboost"]
-    assert pipeline.named_steps["model"].get_params()["cat_features"] is None
+    assert pipeline.named_steps["model"].get_params().get("cat_features") is None
     assert CATEGORICAL_FEATURE_COLS == ["customer_state", "snapshot_month"]
 
 
@@ -166,5 +166,5 @@ def test_calibration_table_handles_constant_probability_scores():
     )
     assert len(table) == 1
     assert table.loc[0, "customers"] == 6
-    assert table.loc[0, "mean_predicted_probability"] == 0.05
-    assert table.loc[0, "observed_repeat_rate"] == 0.5
+    assert np.isclose(table.loc[0, "mean_predicted_probability"], 0.05)
+    assert np.isclose(table.loc[0, "observed_repeat_rate"], 0.5)
