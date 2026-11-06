@@ -1,51 +1,82 @@
 # Churn Modeling Methodology
 
-## Business question
+## Prediction question
 
-Among customers who have already demonstrated engagement, which customers are at risk of making no delivered purchase during the next 90 days?
+At the beginning of a monthly snapshot, among customers with at least two
+previously delivered orders and delivered activity in the prior 180 days, will
+the customer place no order that is eventually delivered during the next 90 days?
 
-## Modeling population
+This is a forward-looking 90-day inactivity label, not permanent customer loss.
 
-A customer-month becomes eligible when:
-- the customer has at least two delivered orders through that month; and
-- the customer has recent delivered activity in the preceding rolling 180-day feature window.
+## Snapshot and eligible population
 
-## Snapshot
+- Customers enter after their second delivered order has reached the customer.
+- The first snapshot is the first day of the following calendar month.
+- A snapshot is retained only when the customer has at least one order both
+  purchased and delivered during the exact prior 180-day feature window.
+- Monthly snapshots continue after earlier inactivity labels, allowing
+  customers to reactivate.
+- A snapshot is eligible only when the source contains a complete 90-day
+  forward observation window.
 
-A monthly activity row is converted into a prediction snapshot on the first day of the following month.
+## Target definition
 
-## Features
+The SQL target uses the half-open interval
+[snapshot_date, snapshot_date + 90 days).
 
-All predictors are derived from delivered activity on or before the snapshot month:
-- 30/90/180-day order counts
-- 30/90/180-day revenue
-- average order value
-- average review score
-- average delivery delay
-- active months
-- recency
-- recent order share
-- recent revenue share
-- orders per active month
-- revenue per order
-- recent-vs-older order ratio
+- churned = 1 when no eventually-delivered order has a purchase timestamp in
+  this interval.
+- churned = 0 when at least one eventually-delivered order was purchased in it.
+- A purchase exactly at the 90-day upper boundary is outside the interval.
+- Observation end is based on the latest purchase timestamp across all source
+  orders, not only delivered orders.
 
-## Target
+Future records create the label only; they are never used as predictors.
 
-`churned = 1` when the customer's next delivered activity is at least 90 days after the snapshot, or there is no later activity within the available data.
+## Point-in-time features
 
-`churned = 0` when another delivered activity occurs within the next 90 days.
+For snapshot date t, historical order features use purchase timestamps in
+[t - 180 days, t) and require delivery to have occurred before t. The 90-day
+and 30-day order/revenue counts are nested windows within the 180-day window.
 
-The last 90 days of the source history are excluded from snapshots so every label has a complete future window.
+Other features include average order value, average delivery delay, active
+purchase months, recency, order/revenue shares, and order-value ratios. Review
+scores are included only when the review-creation timestamp precedes t.
 
-## Leakage prevention
+## Temporal evaluation protocol
 
-Future orders are used only to construct the label. Feature calculations are restricted to activity through the snapshot month.
+Unique snapshot dates are split chronologically into approximately:
+- 64% training dates for model fitting and temporal CV;
+- 16% validation dates for threshold selection;
+- latest 20% for final holdout evaluation.
 
-## Evaluation
+Expanding-window CV folds are created from unique snapshot dates, not rows.
+All customers from one snapshot date are assigned to the same fold side.
+Customers may occur in earlier and later periods; this measures future
+predictions for known customers, matching the intended use case.
 
-Use chronological holdout dates. Never randomly mix future snapshots into training.
+The candidate model is selected by mean CV average precision (PR-AUC).
+The threshold is selected by maximizing F1 on the separate validation period.
+Since no business cost matrix is supplied, this is a technical proxy rather
+than a proven profit-maximizing intervention threshold.
 
-## Performance design
+The frozen model and threshold are evaluated once on the final chronological
+holdout. The holdout is not used for model or threshold selection.
 
-The expensive raw order history is first materialized into `ml.delivered_orders`, then aggregated to `ml.customer_monthly_activity`. The final churn dataset is built from those compact tables.
+## Imbalance and baseline reporting
+
+Report class counts and prevalence for each partition, average precision,
+ROC-AUC, thresholded precision/recall/F1, confusion matrix, classification
+report, and a DummyClassifier prior-probability average-precision baseline.
+
+Interpret average precision relative to positive-class prevalence. A high
+PR-AUC alone is not evidence of useful discrimination when positives are common.
+
+## Limitations
+
+- Evaluation allows customers in earlier training periods to appear in later
+  periods. It is not unseen-customer generalization.
+- Final delivery status is used retrospectively to define delivered events;
+  predictors are restricted to information observable at snapshot time.
+- F1-based threshold selection does not encode intervention economics.
+- Olist is a historical dataset, not a live marketplace feed.
