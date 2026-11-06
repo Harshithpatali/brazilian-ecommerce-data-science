@@ -19,7 +19,7 @@ permissions:
 
 concurrency:
   group: churn-rebuild-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   rebuild-train-and-commit:
