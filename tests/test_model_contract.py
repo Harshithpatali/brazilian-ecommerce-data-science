@@ -10,6 +10,8 @@ def valid_metadata():
         "model_version": MODEL_VERSION,
         "feature_columns": FEATURE_COLS,
         "evaluation_positive_class": "purchase_within_90_days (SQL churned=0)",
+        "threshold_selection": "maximum F2 for purchase_within_90_days on separate validation period",
+        "threshold_beta": 2.0,
         "repeat_purchase_probability_threshold": 0.03,
         "feature_availability": {
             "review_score": "review_answer_timestamp < snapshot_date",
