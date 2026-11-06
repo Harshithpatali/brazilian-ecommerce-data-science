@@ -48,6 +48,7 @@ def validate_model_metadata(metadata: dict[str, Any]) -> list[str]:
     if metadata.get("evaluation_positive_class") != "purchase_within_90_days (SQL churned=0)":
         errors.append("evaluation_positive_class must identify repeat purchase (SQL churned=0).")
 
+    threshold = metadata.get("threshold")
     repeat_threshold = metadata.get("repeat_purchase_probability_threshold")
     if not isinstance(repeat_threshold, (int, float)) or not isfinite(float(repeat_threshold)):
         errors.append("repeat_purchase_probability_threshold must be finite.")
@@ -73,7 +74,6 @@ def validate_model_metadata(metadata: dict[str, Any]) -> list[str]:
     ):
         errors.append("model_sha256 must be a 64-character lowercase SHA-256 digest.")
 
-    threshold = metadata.get("threshold")
     if not isinstance(threshold, (int, float)) or not isfinite(float(threshold)):
         errors.append("threshold must be a finite number.")
     elif not 0 <= float(threshold) <= 1:
