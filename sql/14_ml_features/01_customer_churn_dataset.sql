@@ -38,11 +38,11 @@ ANALYZE ml.delivered_orders;
 
 /* Point-in-time review events support efficient as-of review features. */
 CREATE TABLE ml.review_events AS
-SELECT order_id, review_score, review_creation_date
+SELECT order_id, review_score, review_creation_date, review_answer_timestamp
 FROM public.olist_order_reviews
-WHERE order_id IS NOT NULL AND review_creation_date IS NOT NULL;
+WHERE order_id IS NOT NULL AND review_answer_timestamp IS NOT NULL;
 CREATE INDEX idx_ml_review_order_date
-    ON ml.review_events (order_id, review_creation_date);
+    ON ml.review_events (order_id, review_answer_timestamp);
 ANALYZE ml.review_events;
 
 CREATE TABLE ml.customer_monthly_activity AS
@@ -194,7 +194,7 @@ LEFT JOIN LATERAL (
         SELECT AVG(r.review_score)::numeric AS order_avg_review_score
         FROM ml.review_events r
         WHERE r.order_id = d.order_id
-          AND r.review_creation_date < s.snapshot_date
+          AND r.review_answer_timestamp < s.snapshot_date
     ) order_review
     WHERE d.customer_unique_id = s.customer_unique_id
       AND d.order_purchase_timestamp >= s.snapshot_date - INTERVAL '180 days'
