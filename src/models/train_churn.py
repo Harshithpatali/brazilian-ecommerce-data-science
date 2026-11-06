@@ -63,7 +63,7 @@ def chronological_partition_indices(
 
     test_start = int(np.floor(len(unique) * (1 - test_fraction)))
     test_start = min(max(test_start, 2), len(unique) - 1)
-    validation_count = max(1, int(np.ceil(test_start * validation_fraction)))
+    validation_count = max(1, int(np.floor(test_start * validation_fraction)))
     validation_start = test_start - validation_count
     if validation_start < 4:
         raise ValueError("Too few training dates remain for temporal CV.")
