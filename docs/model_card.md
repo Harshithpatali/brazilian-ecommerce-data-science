@@ -2,7 +2,7 @@
 
 ## Status
 
-The corrected pipeline version is churn-pit-v2. Existing checked-in model
+The corrected pipeline version is churn-pit-v3. Existing checked-in model
 artifacts were generated before the corrected target and evaluation protocol.
 They must be regenerated from the configured PostgreSQL database before the
 dashboard can serve the updated churn model.
