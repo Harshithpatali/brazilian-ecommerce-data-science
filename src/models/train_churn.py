@@ -280,26 +280,26 @@ def build_models() -> dict[str, tuple[Pipeline, dict[str, list[Any]]]]:
             ]),
             {
                 "model__max_iter": [150, 300],
-                "model__learning_rate": [0.03, 0.08],
+                "model__learning_rate": [0.03, 0.07],
                 "model__max_leaf_nodes": [15, 31],
-                "model__min_samples_leaf": [20, 50],
-                "model__l2_regularization": [0.0, 1.0],
+                "model__min_samples_leaf": [100],
+                "model__l2_regularization": [1.0],
             },
         ),
         "random_forest": (
             Pipeline([
                 ("preprocess", preprocess),
                 ("model", RandomForestClassifier(
-                    n_estimators=300,
+                    n_estimators=120,
                     class_weight="balanced_subsample",
                     random_state=42,
                     n_jobs=1,
                 )),
             ]),
             {
-                "model__max_depth": [3, 5, None],
-                "model__min_samples_leaf": [2, 5, 10],
-                "model__max_features": ["sqrt", 0.8],
+                "model__max_depth": [6, None],
+                "model__min_samples_leaf": [20, 50],
+                "model__max_features": ["sqrt"],
             },
         ),
     }
