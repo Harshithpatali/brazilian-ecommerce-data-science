@@ -3,14 +3,34 @@
 !.env.example
 
 __pycache__/
-*.pyc
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 
 .venv/
 venv/
+ENV/
 
 mlruns/
 *.log
-
 .DS_Store
 
 .streamlit/secrets.toml
+
+# Raw/intermediate source data and local exports must not be committed.
+data/raw/
+data/interim/
+data/processed/
+data/local/
+*.duckdb
+*.sqlite
+
+# Reproducible local evaluation outputs.
+# The small dashboard datasets, historical scoring sample, fitted model,
+# comparison and metadata tracked here are intentional deployment assets.
+models/test_predictions.parquet
+models/test_classification_report.json
+models/test_confusion_matrix.json
+models/test_precision_recall_curve.csv
+models/*.tmp
