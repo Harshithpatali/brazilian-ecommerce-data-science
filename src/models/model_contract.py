@@ -10,6 +10,9 @@ MODEL_VERSION = "churn-pit-v5"
 
 _REQUIRED_METRICS = (
     "roc_auc",
+    "gini",
+    "ks_statistic",
+    "expected_calibration_error",
     "pr_auc",
     "precision",
     "recall",
@@ -47,6 +50,8 @@ _REQUIRED_METRICS = (
 
 _BOUNDED_METRICS = (
     "roc_auc",
+    "ks_statistic",
+    "expected_calibration_error",
     "pr_auc",
     "precision",
     "recall",
@@ -162,6 +167,9 @@ def validate_model_metadata(metadata: dict[str, Any]) -> list[str]:
         mcc = metrics.get("matthews_corrcoef")
         if _finite_number(mcc) and not -1 <= float(mcc) <= 1:
             errors.append("test_metrics.matthews_corrcoef must be between -1 and 1.")
+        gini = metrics.get("gini")
+        if _finite_number(gini) and not -1 <= float(gini) <= 1:
+            errors.append("test_metrics.gini must be between -1 and 1.")
     baseline = metadata.get("dummy_baseline")
     if not isinstance(baseline, dict):
         errors.append("dummy_baseline is missing or is not an object.")
@@ -249,6 +257,32 @@ def validate_model_metadata(metadata: dict[str, Any]) -> list[str]:
             errors.append("Customer-bootstrap PR-AUC interval is invalid.")
         if not isinstance(replicates, int) or replicates < 30:
             errors.append("Customer-bootstrap interval must contain at least 30 valid replicates.")
+
+    capacity_bootstrap = metadata.get("customer_bootstrap_top10_95_ci")
+    if not isinstance(capacity_bootstrap, dict):
+        errors.append("customer_bootstrap_top10_95_ci is missing.")
+    else:
+        for metric_name in ("precision", "recall", "lift", "flagged_fraction"):
+            interval = capacity_bootstrap.get(metric_name)
+            if not isinstance(interval, dict):
+                errors.append(f"customer_bootstrap_top10_95_ci.{metric_name} is missing.")
+                continue
+            lower, upper, replicates = (
+                interval.get("lower_95"),
+                interval.get("upper_95"),
+                interval.get("replicates"),
+            )
+            if not (_finite_number(lower) and _finite_number(upper) and lower <= upper):
+                errors.append(f"customer-bootstrap interval for {metric_name} is invalid.")
+            if not isinstance(replicates, int) or replicates < 30:
+                errors.append(f"Customer-bootstrap interval for {metric_name} has too few replicates.")
+            if metric_name != "lift":
+                if _finite_number(lower) and not 0 <= float(lower) <= 1:
+                    errors.append(f"Customer-bootstrap lower bound for {metric_name} must be in [0,1].")
+                if _finite_number(upper) and not 0 <= float(upper) <= 1:
+                    errors.append(f"Customer-bootstrap upper bound for {metric_name} must be in [0,1].")
+            elif _finite_number(lower) and float(lower) < 0:
+                errors.append("Customer-bootstrap lift lower bound must be non-negative.")
 
     unique_customers = metadata.get("unique_customers")
     if not isinstance(unique_customers, dict) or not isinstance(unique_customers.get("all"), int):
