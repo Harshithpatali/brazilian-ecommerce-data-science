@@ -16,7 +16,8 @@ part of the training code.
 ## Training and selection
 
 - Unique snapshot dates remain intact when constructing temporal folds.
-- Expanding-window cross-validation is run on the training period.
+- Expanding-window cross-validation is run on the training period with a 90-day
+  purge between each fold's training and validation dates.
 - GridSearchCV optimizes average precision (PR-AUC).
 - The winning model and hyperparameters are selected using CV PR-AUC only.
   Final holdout metrics are never used to choose a candidate.
@@ -24,7 +25,9 @@ part of the training code.
 ## Validation and final holdout
 
 Unique dates are separated chronologically into train, validation, and final
-test periods (approximately 64% / 16% / 20%).
+test periods. A 90-day embargo is applied between each period because the
+target looks 90 days into the future. Snapshots whose outcome windows overlap
+the next period are excluded from the earlier partition.
 
 - Validation selects a classification threshold by maximum F1.
 - The final test period is evaluated once after the model and threshold are frozen.
