@@ -8,6 +8,8 @@ review_answer_timestamp. The source observation end uses all source orders.
 Every eligible monthly snapshot is retained: 90-day churn is not permanent.
 */
 
+DROP TABLE IF EXISTS ml.order_behavior CASCADE;
+DROP TABLE IF EXISTS ml.first_delivered_orders CASCADE;
 DROP TABLE IF EXISTS ml.delivered_orders CASCADE;
 DROP TABLE IF EXISTS ml.customer_monthly_activity CASCADE;
 DROP TABLE IF EXISTS ml.customer_snapshot_calendar CASCADE;
@@ -35,6 +37,100 @@ CREATE INDEX idx_ml_delivered_customer_delivery
 CREATE INDEX idx_ml_delivered_purchase
     ON ml.delivered_orders (order_purchase_timestamp);
 ANALYZE ml.delivered_orders;
+
+/*
+ORDER-LEVEL CUSTOMER BEHAVIOUR
+Pre-aggregate item and payment facts once at order grain. The customer-month
+model only joins orders whose purchase and delivery timestamps precede the
+snapshot, avoiding future item/payment leakage.
+*/
+CREATE TABLE ml.order_behavior AS
+WITH item_features AS (
+    SELECT
+        oi.order_id,
+        COUNT(*)::integer AS item_count,
+        COUNT(DISTINCT oi.product_id)::integer AS distinct_products,
+        COUNT(DISTINCT COALESCE(p.product_category_name, 'unknown'))::integer
+            AS distinct_categories,
+        COUNT(DISTINCT oi.seller_id)::integer AS seller_count,
+        COALESCE(SUM(oi.price), 0)::numeric AS item_price,
+        COALESCE(SUM(oi.freight_value), 0)::numeric AS freight_value
+    FROM public.olist_order_items oi
+    LEFT JOIN public.olist_products p
+        ON p.product_id = oi.product_id
+    GROUP BY oi.order_id
+),
+payment_features AS (
+    SELECT
+        order_id,
+        COALESCE(MAX(payment_installments), 0)::integer AS max_installments,
+        COUNT(DISTINCT payment_type)::integer AS payment_type_count,
+        BOOL_OR(LOWER(payment_type) = 'credit_card')::integer
+            AS is_credit_card,
+        BOOL_OR(LOWER(payment_type) = 'boleto')::integer AS is_boleto,
+        BOOL_OR(LOWER(payment_type) = 'debit_card')::integer
+            AS is_debit_card,
+        BOOL_OR(LOWER(payment_type) = 'voucher')::integer AS is_voucher
+    FROM public.olist_order_payments
+    GROUP BY order_id
+)
+SELECT
+    ol.order_id,
+    ol.customer_unique_id,
+    ol.order_purchase_timestamp,
+    ol.order_delivered_customer_date,
+    COALESCE(ol.gross_order_value, 0)::numeric AS gross_order_value,
+    COALESCE(i.item_count, ol.item_count, 0)::integer AS item_count,
+    COALESCE(i.distinct_products, 0)::integer AS distinct_products,
+    COALESCE(i.distinct_categories, 0)::integer AS distinct_categories,
+    COALESCE(i.seller_count, 0)::integer AS seller_count,
+    COALESCE(i.item_price, ol.product_revenue, 0)::numeric AS item_price,
+    COALESCE(i.freight_value, ol.freight_revenue, 0)::numeric AS freight_value,
+    COALESCE(
+        i.freight_value / NULLIF(ol.gross_order_value, 0),
+        0
+    )::numeric AS freight_share,
+    COALESCE(p.max_installments, 0)::integer AS max_installments,
+    COALESCE(p.payment_type_count, 0)::integer AS payment_type_count,
+    COALESCE(p.is_credit_card, 0)::integer AS is_credit_card,
+    COALESCE(p.is_boleto, 0)::integer AS is_boleto,
+    COALESCE(p.is_debit_card, 0)::integer AS is_debit_card,
+    COALESCE(p.is_voucher, 0)::integer AS is_voucher,
+    COALESCE(ol.delivery_days, 0)::numeric AS delivery_days,
+    COALESCE(ol.delivery_delay_days, 0)::numeric AS delivery_delay_days,
+    EXTRACT(EPOCH FROM (ol.order_approved_at - ol.order_purchase_timestamp))
+        / 3600.0 AS approval_lag_hours
+FROM analytics.order_level ol
+LEFT JOIN item_features i ON i.order_id = ol.order_id
+LEFT JOIN payment_features p ON p.order_id = ol.order_id
+WHERE ol.customer_unique_id IS NOT NULL;
+
+CREATE UNIQUE INDEX idx_ml_order_behavior_order
+    ON ml.order_behavior (order_id);
+CREATE INDEX idx_ml_order_behavior_customer_purchase
+    ON ml.order_behavior (customer_unique_id, order_purchase_timestamp);
+ANALYZE ml.order_behavior;
+
+/* First delivered order establishes the second-purchase prediction cohort. */
+CREATE TABLE ml.first_delivered_orders AS
+SELECT customer_unique_id, order_id AS first_order_id,
+       order_delivered_customer_date AS first_delivery_timestamp
+FROM (
+    SELECT
+        customer_unique_id,
+        order_id,
+        order_delivered_customer_date,
+        ROW_NUMBER() OVER (
+            PARTITION BY customer_unique_id
+            ORDER BY order_delivered_customer_date, order_id
+        ) AS delivered_order_number
+    FROM ml.delivered_orders
+) ranked
+WHERE delivered_order_number = 1;
+
+CREATE UNIQUE INDEX idx_ml_first_delivered_customer
+    ON ml.first_delivered_orders (customer_unique_id);
+ANALYZE ml.first_delivered_orders;
 
 /* Point-in-time review events support efficient as-of review features. */
 CREATE TABLE ml.review_events AS
@@ -66,25 +162,7 @@ ANALYZE ml.customer_monthly_activity;
    cohort: a customer becomes eligible after their first order is delivered.
    Only dates with a fully observed 90-day forward label window are materialized. */
 CREATE TABLE ml.customer_snapshot_calendar AS
-WITH ranked_delivered AS (
-    SELECT
-        customer_unique_id,
-        order_id,
-        order_delivered_customer_date,
-        ROW_NUMBER() OVER (
-            PARTITION BY customer_unique_id
-            ORDER BY order_delivered_customer_date, order_id
-        ) AS delivered_order_number
-    FROM ml.delivered_orders
-),
-first_delivered AS (
-    SELECT
-        customer_unique_id,
-        order_delivered_customer_date AS first_delivery_timestamp
-    FROM ranked_delivered
-    WHERE delivered_order_number = 1
-),
-observation_end AS (
+WITH observation_end AS (
     SELECT MAX(order_purchase_timestamp) AS max_observed_purchase_timestamp
     FROM analytics.order_level
     WHERE order_purchase_timestamp IS NOT NULL
@@ -92,7 +170,7 @@ observation_end AS (
 SELECT
     s.customer_unique_id,
     generated.snapshot_timestamp::date AS snapshot_date
-FROM first_delivered s
+FROM ml.first_delivered_orders s
 CROSS JOIN observation_end o
 CROSS JOIN LATERAL GENERATE_SERIES(
     (
@@ -117,6 +195,28 @@ CREATE TABLE ml.customer_churn_dataset AS
 SELECT
     s.customer_unique_id,
     s.snapshot_date,
+    first_order.gross_order_value AS first_order_gross_value,
+    first_order.item_count AS first_order_item_count,
+    first_order.distinct_products AS first_order_distinct_products,
+    first_order.distinct_categories AS first_order_distinct_categories,
+    first_order.seller_count AS first_order_seller_count,
+    first_order.freight_share AS first_order_freight_share,
+    first_order.max_installments AS first_order_max_installments,
+    first_order.payment_type_count AS first_order_payment_type_count,
+    first_order.is_credit_card AS first_order_is_credit_card,
+    first_order.is_boleto AS first_order_is_boleto,
+    first_order.is_debit_card AS first_order_is_debit_card,
+    first_order.is_voucher AS first_order_is_voucher,
+    first_order.delivery_days AS first_order_delivery_days,
+    first_order.delivery_delay_days AS first_order_delivery_delay_days,
+    first_order.approval_lag_hours AS first_order_approval_lag_hours,
+    first_review.first_order_review_score,
+    profile.avg_items_per_order_180d,
+    profile.avg_categories_per_order_180d,
+    profile.avg_sellers_per_order_180d,
+    profile.avg_payment_installments_180d,
+    profile.credit_card_order_share_180d,
+    profile.avg_freight_share_180d,
     f.orders_180d,
     f.orders_90d,
     f.orders_30d,
@@ -165,6 +265,31 @@ SELECT
         ELSE 1
     END AS churned
 FROM ml.customer_snapshot_calendar s
+JOIN ml.first_delivered_orders first_order_key
+    ON first_order_key.customer_unique_id = s.customer_unique_id
+JOIN ml.order_behavior first_order
+    ON first_order.order_id = first_order_key.first_order_id
+LEFT JOIN LATERAL (
+    SELECT AVG(r.review_score)::numeric AS first_order_review_score
+    FROM ml.review_events r
+    WHERE r.order_id = first_order_key.first_order_id
+      AND r.review_answer_timestamp < s.snapshot_date
+) first_review ON TRUE
+CROSS JOIN LATERAL (
+    SELECT
+        AVG(ob.item_count)::numeric AS avg_items_per_order_180d,
+        AVG(ob.distinct_categories)::numeric AS avg_categories_per_order_180d,
+        AVG(ob.seller_count)::numeric AS avg_sellers_per_order_180d,
+        AVG(ob.max_installments)::numeric AS avg_payment_installments_180d,
+        AVG(ob.is_credit_card::numeric) AS credit_card_order_share_180d,
+        AVG(ob.freight_share)::numeric AS avg_freight_share_180d
+    FROM ml.delivered_orders d
+    JOIN ml.order_behavior ob ON ob.order_id = d.order_id
+    WHERE d.customer_unique_id = s.customer_unique_id
+      AND d.order_purchase_timestamp >= s.snapshot_date - INTERVAL '180 days'
+      AND d.order_purchase_timestamp < s.snapshot_date
+      AND d.order_delivered_customer_date < s.snapshot_date
+) profile
 CROSS JOIN LATERAL (
     SELECT
         COUNT(*)::integer AS orders_180d,
