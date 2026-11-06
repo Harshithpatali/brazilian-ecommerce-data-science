@@ -26,3 +26,12 @@ def test_missing_integrity_count_fails():
     checks.pop("target_mismatches")
     with pytest.raises(SystemExit, match="target_mismatches"):
         assert_zero_integrity_checks(checks)
+
+
+
+def test_v5_requires_categorical_feature_integrity_check():
+    assert "invalid_categorical_feature_rows" in EXPECTED_ZERO_CHECKS
+    checks = zero_checks()
+    checks["invalid_categorical_feature_rows"] = 1
+    with pytest.raises(SystemExit, match="invalid_categorical_feature_rows"):
+        assert_zero_integrity_checks(checks)
