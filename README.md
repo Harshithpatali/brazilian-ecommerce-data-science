@@ -245,7 +245,7 @@ Every script is designed to be **rerunnable against a live database** without ma
 
 **Business question:** *After a customer's first delivered order, how likely are they to place a second delivered order within the next 90 days?*
 
-The v5 cohort corrects an earlier modeling-definition issue: starting after the second delivered order predicts a third-or-later purchase. The revised cohort starts after the **first delivered order**, making the target a second-purchase propensity problem.
+The v6 cohort corrects an earlier modeling-definition issue: starting after the second delivered order predicts a third-or-later purchase. The revised cohort starts after the **first delivered order**, making the target a second-purchase propensity problem.
 
 ### Point-in-time population and target
 
@@ -262,13 +262,13 @@ The v5 cohort corrects an earlier modeling-definition issue: starting after the 
 
 A read-only audit of the connected Olist source found **99,441 source orders**, **96,470 delivered orders** and **93,350 customers with a delivered order**. The first-delivered-order cohort query produced **357,413 eligible customer-month snapshots across 79,594 customers**, including **2,686 second-purchase events (0.752%)**.
 
-These are database cohort-audit counts, not final v5 train/validation/test metrics. The automated rebuild checks the resulting extract against minimum row, customer and positive-event counts before training, so a stale second-or-later-purchase dataset or truncated database cannot silently be used.
+These are database cohort-audit counts, not final v6 train/validation/test metrics. The automated rebuild checks the resulting extract against minimum row, customer and positive-event counts before training, so a stale second-or-later-purchase dataset or truncated database cannot silently be used.
 
 ### Model selection and evaluation design
 
 Three ML candidate families (Logistic Regression, HistGradientBoosting and Random Forest) compete with three point-in-time RFM scorers (recency-only, recent-frequency-only and lifetime-frequency-only). Every candidate is evaluated with the same temporal folds; the selected approach must beat the simple baselines in cross-validation before it is considered useful. Hyperparameters are selected by **expanding-window, date-grouped, 90-day-purged temporal cross-validation**, optimizing average precision for the second-purchase event. A separate chronological validation period is used for model calibration and the operating threshold; the latest chronological holdout is not used for model, calibration or threshold selection.
 
-The v5 evaluation adds the measures needed to judge a campaign-ranking system rather than a single arbitrary classification threshold:
+The v6 evaluation adds the measures needed to judge a campaign-ranking system rather than a single arbitrary classification threshold:
 
 - **Ranking:** PR-AUC and ROC-AUC, compared with prior, recency-only, recent-frequency-only and lifetime-frequency-only baselines.
 - **Calibration:** Platt sigmoid calibration fitted on purged out-of-fold training predictions, plus Brier score, log-loss, expected calibration error and reliability bins.
@@ -277,7 +277,7 @@ The v5 evaluation adds the measures needed to judge a campaign-ranking system ra
 - **Generalization:** a separate test subset for customers absent from both training and validation, alongside known-customer future scoring.
 - **Decision policy:** the F2 threshold remains a diagnostic operating point. The dashboard ranks prospects against a monthly contact-capacity setting instead of treating the F2 threshold as a campaign rule.
 
-The final v5 scores will be published only after the complete-data rebuild, integrity checks, automated tests, model-artifact verification and final holdout evaluation succeed. No v5 performance scores are claimed before that run completes.
+The final v6 scores will be published only after the complete-data rebuild, integrity checks, automated tests, model-artifact verification and final holdout evaluation succeed. No v6 performance scores are claimed before that run completes.
 
 See [\`docs/churn_methodology.md\`](docs/churn_methodology.md), [\`docs/ml_modeling.md\`](docs/ml_modeling.md) and [\`docs/model_card.md\`](docs/model_card.md) for the protocol and limitations.
 
