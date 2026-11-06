@@ -58,15 +58,15 @@ def chronological_partition_indices(
         raise ValueError("Partition fractions must be between 0 and 0.5.")
     row_dates = _dates(snapshot_dates)
     unique = np.array(sorted(row_dates.unique()))
-    if len(unique) < 8:
-        raise ValueError("At least 8 unique snapshot dates are required.")
+    if len(unique) < 10:
+        raise ValueError("At least 10 unique snapshot dates are required for train, validation, CV, and test.")
 
     test_start = int(np.floor(len(unique) * (1 - test_fraction)))
     test_start = min(max(test_start, 2), len(unique) - 1)
     validation_count = max(1, int(np.floor(test_start * validation_fraction)))
     validation_start = test_start - validation_count
-    if validation_start < 4:
-        raise ValueError("Too few training dates remain for temporal CV.")
+    if validation_start < 6:
+        raise ValueError("Too few training dates remain for date-grouped temporal CV.")
 
     train_dates = unique[:validation_start]
     validation_dates = unique[validation_start:test_start]
@@ -90,27 +90,69 @@ def chronological_partition_indices(
 
 
 def make_date_grouped_splits(
-    snapshot_dates: pd.Series | list[Any], n_splits: int = 4
+    snapshot_dates: pd.Series | list[Any],
+    y: pd.Series | np.ndarray | None = None,
+    n_splits: int = 4,
 ) -> list[tuple[np.ndarray, np.ndarray]]:
-    """Expanding-window CV over unique dates, not individual rows."""
+    """
+    Build expanding-window folds over unique dates.
+
+    When labels are supplied, shorten the fold count or extend the initial
+    training window until every training and validation fold contains both
+    classes. This avoids misleading AP scores from single-class time blocks.
+    """
     row_dates = _dates(snapshot_dates)
     unique = np.array(sorted(row_dates.unique()))
-    if n_splits < 2 or len(unique) <= n_splits:
-        raise ValueError("Not enough unique dates for the requested CV folds.")
+    if n_splits < 2 or len(unique) < n_splits + 4:
+        raise ValueError("Not enough unique dates for temporal CV.")
 
-    splitter = TimeSeriesSplit(n_splits=n_splits)
     values = row_dates.to_numpy()
-    folds = []
-    for train_date_idx, valid_date_idx in splitter.split(unique):
-        train_dates = unique[train_date_idx]
-        valid_dates = unique[valid_date_idx]
-        if train_dates.max() >= valid_dates.min():
-            raise RuntimeError("Temporal CV split is not strictly chronological.")
-        folds.append((
-            np.flatnonzero(np.isin(values, train_dates)),
-            np.flatnonzero(np.isin(values, valid_dates)),
-        ))
-    return folds
+    labels = None if y is None else np.asarray(pd.Series(y).reset_index(drop=True))
+    if labels is not None and len(labels) != len(values):
+        raise ValueError("y and snapshot_dates must have the same number of rows.")
+
+    if labels is None:
+        splitter = TimeSeriesSplit(n_splits=n_splits)
+        folds = []
+        for train_date_idx, valid_date_idx in splitter.split(unique):
+            train_dates = unique[train_date_idx]
+            valid_dates = unique[valid_date_idx]
+            folds.append((
+                np.flatnonzero(np.isin(values, train_dates)),
+                np.flatnonzero(np.isin(values, valid_dates)),
+            ))
+        return folds
+
+    minimum_warmup = max(4, int(np.ceil(len(unique) * 0.25)))
+    for fold_count in range(min(n_splits, len(unique) - minimum_warmup), 1, -1):
+        for warmup_end in range(minimum_warmup, len(unique) - fold_count + 1):
+            remaining_dates = unique[warmup_end:]
+            blocks = [block for block in np.array_split(remaining_dates, fold_count) if len(block)]
+            if len(blocks) != fold_count:
+                continue
+
+            candidate_folds = []
+            valid_candidate = True
+            for block in blocks:
+                training_dates = unique[unique < block[0]]
+                training_idx = np.flatnonzero(np.isin(values, training_dates))
+                validation_idx = np.flatnonzero(np.isin(values, block))
+                if len(np.unique(labels[training_idx])) != 2:
+                    valid_candidate = False
+                    break
+                if len(np.unique(labels[validation_idx])) != 2:
+                    valid_candidate = False
+                    break
+                candidate_folds.append((training_idx, validation_idx))
+
+            if valid_candidate:
+                return candidate_folds
+
+    raise ValueError(
+        "Could not create at least two chronological CV folds containing both "
+        "classes in training and validation. Inspect class prevalence by month "
+        "or collect a longer observation period."
+    )
 
 
 def choose_f1_threshold(
@@ -220,10 +262,7 @@ def main() -> None:
 
     train_dates = df["snapshot_date"].iloc[train_idx].reset_index(drop=True)
     n_dates = int(train_dates.dt.normalize().nunique())
-    folds = make_date_grouped_splits(train_dates, n_splits=min(4, n_dates - 1))
-    for number, (fit_idx, valid_idx) in enumerate(folds, start=1):
-        _require_both_classes(y_train.iloc[fit_idx], f"CV fold {number} training")
-        _require_both_classes(y_train.iloc[valid_idx], f"CV fold {number} validation")
+    folds = make_date_grouped_splits(train_dates, y=y_train, n_splits=min(4, n_dates - 1))
 
     experiment = configure_mlflow()
     searches: dict[str, GridSearchCV] = {}
