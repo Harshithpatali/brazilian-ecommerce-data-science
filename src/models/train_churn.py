@@ -382,11 +382,11 @@ def build_models() -> dict[str, tuple[Pipeline, dict[str, list[Any]]]]:
                 )),
             ]),
             {
-                "model__max_iter": [200, 400],
-                "model__learning_rate": [0.03, 0.08],
+                "model__max_iter": [150, 300],
+                "model__learning_rate": [0.05, 0.10],
                 "model__max_leaf_nodes": [15, 31],
                 "model__min_samples_leaf": [50],
-                "model__l2_regularization": [0.1, 1.0],
+                "model__l2_regularization": [1.0],
             },
         ),
         "random_forest": (
@@ -408,7 +408,7 @@ def build_models() -> dict[str, tuple[Pipeline, dict[str, list[Any]]]]:
         "catboost": (
             Pipeline([
                 ("model", CatBoostClassifier(
-                    iterations=500,
+                    iterations=350,
                     depth=6,
                     learning_rate=0.05,
                     loss_function="Logloss",
@@ -423,8 +423,8 @@ def build_models() -> dict[str, tuple[Pipeline, dict[str, list[Any]]]]:
             ]),
             {
                 "model__depth": [4, 6],
-                "model__learning_rate": [0.03, 0.06],
-                "model__l2_leaf_reg": [3, 6],
+                "model__learning_rate": [0.05],
+                "model__l2_leaf_reg": [3],
             },
         ),
     }
