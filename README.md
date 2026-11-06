@@ -473,7 +473,7 @@ The churn dataset is materialized in PostgreSQL using a compact customer-month t
 pytest
 ```
 
-The test suite includes connection and feature-contract checks plus target-boundary tests and date-grouped temporal partition tests. Database integration checks are run with the configured PostgreSQL instance.
+The test suite includes connection and feature-contract checks, target-boundary tests, SQL target-contract checks, and date-grouped temporal split tests. Database-level integrity checks are run against the configured PostgreSQL instance.
 
 ## 🔒 Security
 
