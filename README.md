@@ -287,7 +287,7 @@ Temporal-CV runs, hyperparameters and final selected-model evaluation are tracke
 
 See [`docs/churn_methodology.md`](docs/churn_methodology.md), [`docs/ml_modeling.md`](docs/ml_modeling.md), and [`docs/model_card.md`](docs/model_card.md) for full details, including known limitations.
 
-> The model artifacts currently committed to the repository predate the corrected `churn-pit-v2` pipeline. The Churn page remains disabled until the PostgreSQL dataset is rebuilt and the corrected model artifacts are generated with `python -m scripts.run_ml`.
+> The model artifacts currently committed to the repository predate the corrected `churn-pit-v3` pipeline. The Churn page remains disabled until the PostgreSQL dataset is rebuilt and the corrected model artifacts are generated with `python -m scripts.run_ml`.
 
 ## 📊 Statistical Analysis
 
@@ -419,7 +419,7 @@ python scripts/run_sql_folder.py sql/15_reporting
 
 ```bash
 python scripts/build_dashboard_data.py   # writes data/dashboard/
-python scripts/build_ml_data.py          # writes data/ml/customer_features.parquet
+python scripts/build_ml_data.py          # writes data/ml/customer_churn_dataset.parquet
 ```
 
 ### 7. Train the churn model
