@@ -147,6 +147,45 @@ def render() -> None:
     for column, (label, value, help_text) in zip(metric_columns, values):
         with column:
             metric_card(label, "N/A" if value is None else f"{float(value):.3f}", help_text=help_text)
+
+    section_title(
+        "Per-class test performance",
+        "Class 0 is a delivered purchase within 90 days; class 1 is no delivered purchase.",
+    )
+    class_report = pd.DataFrame([
+        {
+            "Class": "Purchase within 90 days (0)",
+            "Precision": test_metrics["class_0_precision"],
+            "Recall": test_metrics["class_0_recall"],
+            "F1": test_metrics["class_0_f1"],
+        },
+        {
+            "Class": "No delivered purchase (1)",
+            "Precision": test_metrics["precision"],
+            "Recall": test_metrics["recall"],
+            "F1": test_metrics["f1"],
+        },
+    ])
+    st.dataframe(
+        class_report.style.format({
+            "Precision": "{:.3f}", "Recall": "{:.3f}", "F1": "{:.3f}"
+        }),
+        use_container_width=True,
+        hide_index=True,
+    )
+    quality_columns = st.columns(2)
+    with quality_columns[0]:
+        metric_card(
+            "Balanced accuracy",
+            f"{test_metrics['balanced_accuracy']:.3f}",
+            help_text="Average recall across both classes",
+        )
+    with quality_columns[1]:
+        metric_card(
+            "Matthews correlation",
+            f"{test_metrics['matthews_corrcoef']:.3f}",
+            help_text="Correlation-based score using all confusion-matrix cells",
+        )
     prevalence = baseline.get("test_positive_prevalence")
     if prevalence is not None:
         st.caption(f"Test positive prevalence: {float(prevalence):.1%}. Interpret PR-AUC relative to this baseline.")
