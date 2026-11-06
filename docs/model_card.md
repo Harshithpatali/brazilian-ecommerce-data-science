@@ -36,10 +36,12 @@ records are used only for labels and never for predictors.
 
 ## Point-in-time predictors
 
-The feature contract contains 27 columns for recent and prior purchase
+The feature contract contains 49 columns for recent and prior purchase
 activity, lifetime delivered-order count, customer tenure, interpurchase-gap
-statistics, simultaneous purchase timestamps, recency, revenue, delivery
-experience and review experience.
+statistics, simultaneous purchase timestamps, recency, revenue, first-order
+basket value and composition, product/category/seller diversity, freight
+share, payment method and installments, first-order delivery/review experience,
+and rolling basket/payment behaviour.
 
 Historical purchase and delivery timestamps must precede the snapshot.
 Review scores are included only when
