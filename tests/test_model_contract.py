@@ -216,3 +216,13 @@ def test_gini_must_match_valid_range():
     metadata = valid_metadata()
     metadata["test_metrics"]["gini"] = 1.2
     assert any("test_metrics.gini" in error for error in validate_model_metadata(metadata))
+
+
+
+def test_negative_lift_over_baseline_is_reportable_not_a_contract_failure():
+    metadata = valid_metadata()
+    metadata["test_metrics"]["pr_auc"] = 0.02
+    metadata["test_metrics"]["pr_auc_lift_over_dummy"] = -0.01
+    metadata["test_metrics"]["pr_auc_lift_over_recency"] = 0.25
+    metadata["dummy_baseline"]["test_pr_auc"] = 0.03
+    assert validate_model_metadata(metadata) == []
