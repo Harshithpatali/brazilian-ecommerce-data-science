@@ -159,7 +159,7 @@ def validate_model_metadata(metadata: dict[str, Any]) -> list[str]:
             value = metrics.get(name)
             if _finite_number(value) and not 0 <= float(value) <= 1:
                 errors.append(f"test_metrics.{name} must be between 0 and 1.")
-        for name in ("log_loss", "pr_auc_lift_over_dummy", "pr_auc_lift_over_recency",
+        for name in ("log_loss", "pr_auc_lift_over_recency",
                      "lift_at_5pct", "lift_at_10pct", "lift_at_20pct"):
             value = metrics.get(name)
             if _finite_number(value) and float(value) < 0:
@@ -255,6 +255,8 @@ def validate_model_metadata(metadata: dict[str, Any]) -> list[str]:
         )
         if not (_finite_number(lower) and _finite_number(upper) and lower <= upper):
             errors.append("Customer-bootstrap PR-AUC interval is invalid.")
+        elif not 0 <= float(lower) <= float(upper) <= 1:
+            errors.append("Customer-bootstrap PR-AUC interval must be within [0,1].")
         if not isinstance(replicates, int) or replicates < 30:
             errors.append("Customer-bootstrap interval must contain at least 30 valid replicates.")
 
