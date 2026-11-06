@@ -35,7 +35,7 @@ jobs:
       # Connection secrets are read only from GitHub Actions repository secrets.
       # Their values are never echoed in logs.
       DB_CONNECT_TIMEOUT: "30"
-      MLFLOW_EXPERIMENT_NAME: brazilian-ecommerce-churn-v5
+      MLFLOW_EXPERIMENT_NAME: brazilian-ecommerce-churn-v6
     steps:
       - name: Checkout triggering branch
         uses: actions/checkout@v4
@@ -85,10 +85,10 @@ jobs:
       - name: Validate target, feature cutoff, review timing and snapshot grain
         run: python -m scripts.validate_churn_data
 
-      - name: Export dataset, tune models and produce v5 artifacts
+      - name: Export dataset, tune models and produce v6 artifacts
         run: python -m scripts.run_ml
 
-      - name: Verify v5 metadata and model fingerprint
+      - name: Verify v6 metadata and model fingerprint
         shell: bash
         run: |
           python - <<'PY'
@@ -112,7 +112,7 @@ jobs:
           if not dataset_path.exists() or dataset_path.stat().st_size == 0:
               raise SystemExit("Refreshed churn dataset is missing or empty.")
 
-          print("v5 model contract passed.")
+          print("v6 model contract passed.")
           print(f"Selected model: {metadata['selected_model']}")
           print(f"Final test metrics: {json.dumps(metadata['test_metrics'], sort_keys=True)}")
           print(f"Monthly contact-capacity metrics: {json.dumps(metadata['test_capacity_metrics'], sort_keys=True)}")
@@ -159,7 +159,7 @@ jobs:
           if git diff --cached --quiet; then
             echo "No generated artifacts changed."
           else
-            git commit -m "Retrain and publish validated churn v5 artifacts"
+            git commit -m "Retrain and publish validated churn v6 artifacts"
             git push origin "HEAD:${TARGET_BRANCH}"
           fi
 
@@ -168,7 +168,7 @@ jobs:
         shell: bash
         run: |
           {
-            echo "## Second-purchase propensity v5 rebuild"
+            echo "## Second-purchase propensity v6 rebuild"
             echo "- Branch: ${GITHUB_REF_NAME}"
             echo "- Database preflight, SQL validation, model training, artifact verification and commit are executed as separate stages."
             if [[ -f models/model_metadata.json ]]; then
