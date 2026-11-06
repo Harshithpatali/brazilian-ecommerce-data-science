@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 from typing import Any
@@ -408,6 +409,14 @@ def main() -> None:
             "[snapshot_date, snapshot_date + 90 days); otherwise 0."
         ),
         "feature_columns": FEATURE_COLS,
+        "feature_availability": {
+            "historical_orders": (
+                "order_purchase_timestamp < snapshot_date and "
+                "order_delivered_customer_date < snapshot_date"
+            ),
+            "review_score": "review_answer_timestamp < snapshot_date",
+            "future_orders": "used only to construct the target, never as predictors",
+        },
         "feature_window_days": 180,
         "prediction_window_days": 90,
         "label_horizon_embargo_days": 90,
@@ -431,6 +440,7 @@ def main() -> None:
             "test_pr_auc": dummy_pr_auc,
             "test_positive_prevalence": float(y_test.mean()),
         },
+        "model_sha256": hashlib.sha256(model_path.read_bytes()).hexdigest(),
         "artifacts": {
             "model": "models/best_churn_model.joblib",
             "comparison": "models/model_comparison.csv",
