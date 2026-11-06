@@ -87,3 +87,24 @@ def test_missing_test_metrics_are_rejected():
     metadata = valid_metadata()
     metadata.pop("test_metrics")
     assert any("test_metrics" in error for error in validate_model_metadata(metadata))
+
+
+
+def test_missing_model_hash_is_rejected():
+    metadata = valid_metadata()
+    metadata.pop("model_sha256")
+    assert any("model_sha256" in error for error in validate_model_metadata(metadata))
+
+
+def test_review_creation_timestamp_is_not_accepted_as_availability_time():
+    metadata = valid_metadata()
+    metadata["feature_availability"]["review_score"] = (
+        "review_creation_date < snapshot_date"
+    )
+    assert any("review_answer_timestamp" in error for error in validate_model_metadata(metadata))
+
+
+def test_dummy_baseline_and_lift_must_be_consistent():
+    metadata = valid_metadata()
+    metadata["test_metrics"]["pr_auc_lift_over_dummy"] = 0.10
+    assert any("PR-AUC lift is inconsistent" in error for error in validate_model_metadata(metadata))
