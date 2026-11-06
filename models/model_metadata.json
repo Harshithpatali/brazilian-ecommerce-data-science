@@ -1,36 +1,60 @@
 {
-  "pipeline_status": "ready",
-  "model_version": "churn-pit-v5",
+  "pipeline_status": "research_only",
+  "model_version": "churn-pit-v6",
   "cohort_definition": "Eligible after at least one delivered order; predict the second delivered purchase within the next 90 days.",
-  "experiment_name": "brazilian-ecommerce-churn-v5",
+  "experiment_name": "brazilian-ecommerce-churn-v6",
   "tracking_uri": "file:///home/runner/work/brazilian-ecommerce-data-science/brazilian-ecommerce-data-science/mlruns",
   "selected_model": "random_forest",
+  "promotion_gate": {
+    "test_pr_auc": 0.0104845327212837,
+    "lifetime_frequency_test_pr_auc": 0.01665442870180871,
+    "beats_lifetime_frequency_pr_auc": false,
+    "capacity_comparison": {
+      "5%": {
+        "model_precision": 0.012147444847807875,
+        "lifetime_frequency_precision": 0.016894722144652333,
+        "beats_baseline": false
+      },
+      "10%": {
+        "model_precision": 0.010124284317832705,
+        "lifetime_frequency_precision": 0.012079318530931435,
+        "beats_baseline": false
+      },
+      "20%": {
+        "model_precision": 0.008693223475194637,
+        "lifetime_frequency_precision": 0.008797961107425898,
+        "beats_baseline": false
+      }
+    },
+    "production_eligible": false,
+    "rule": "Must beat lifetime-frequency PR-AUC and precision at 5%, 10%, and 20% monthly contact capacity on the untouched chronological test period."
+  },
   "selection_metric": "cv_average_precision_for_second_purchase_within_90_days_against_rfm_baselines",
   "calibration": {
     "method": "Platt sigmoid",
     "fit_source": "purged out-of-fold predictions from training partition only",
     "training_oof_rows": 54525,
-    "slope": 0.15501324208259426,
-    "intercept": -4.376770538668353
+    "slope": 0.22130936763340942,
+    "intercept": -4.534791093913119
   },
   "threshold_objective": "F2",
   "threshold_beta": 2.0,
   "best_params": {
-    "model__max_depth": null,
+    "model__max_depth": 6,
     "model__max_features": "sqrt",
-    "model__min_samples_leaf": 20
+    "model__min_samples_leaf": 50
   },
-  "threshold": 0.9896088147404654,
+  "threshold": 0.9895158968760775,
   "threshold_selection": "maximum F2 for second_purchase_within_90_days on separate validation period",
-  "repeat_purchase_probability_threshold": 0.010391185259534752,
+  "repeat_purchase_probability_threshold": 0.010484103123922561,
   "evaluation_positive_class": "second_purchase_within_90_days (SQL churned=0)",
   "threshold_validation_metrics": {
-    "precision": 0.02219927723283428,
-    "recall": 0.1096938775510204,
-    "f1": 0.0369257191927866,
-    "f2": 0.06134094151212553,
+    "precision": 0.011268311005383749,
+    "recall": 0.22959183673469388,
+    "f1": 0.021482277121374866,
+    "f2": 0.04709576138147567,
     "beta": 2.0,
-    "repeat_purchase_probability_threshold": 0.010391185259534752
+    "repeat_purchase_probability_threshold": 0.010484103123922561
   },
   "target_definition": "1 when no eventually-delivered order has a purchase timestamp in [snapshot_date, snapshot_date + 90 days); otherwise 0. The positive event is the customer's second delivered purchase after cohort entry.",
   "feature_columns": [
@@ -53,6 +77,14 @@
     "avg_items_per_order_180d",
     "avg_categories_per_order_180d",
     "avg_sellers_per_order_180d",
+    "avg_distinct_products_per_order_180d",
+    "avg_product_diversity_share_180d",
+    "category_preference_entropy_180d",
+    "dominant_category_share_180d",
+    "seller_concentration_hhi_180d",
+    "top_seller_share_180d",
+    "payment_type_diversity_180d",
+    "installment_order_share_180d",
     "avg_payment_installments_180d",
     "credit_card_order_share_180d",
     "avg_freight_share_180d",
@@ -133,34 +165,34 @@
     }
   },
   "test_metrics": {
-    "roc_auc": 0.5539548899952882,
-    "pr_auc": 0.012670130403375793,
-    "precision": 0.014460700918679823,
-    "recall": 0.0963718820861678,
-    "f1": 0.02514792899408284,
-    "f2": 0.04518392515415692,
-    "class_0_precision": 0.014460700918679823,
-    "class_0_recall": 0.0963718820861678,
-    "class_0_f1": 0.02514792899408284,
-    "class_1_precision": 0.9941964610791524,
-    "class_1_recall": 0.9592976687323469,
-    "class_1_f1": 0.9764353348399463,
-    "balanced_accuracy": 0.5278347754092574,
-    "matthews_corrcoef": 0.02195313917831423,
+    "roc_auc": 0.5493940956603636,
+    "pr_auc": 0.0104845327212837,
+    "precision": 0.009450987841945289,
+    "recall": 0.2256235827664399,
+    "f1": 0.018142036648737352,
+    "f2": 0.04047347868532379,
+    "class_0_precision": 0.009450987841945289,
+    "class_0_recall": 0.2256235827664399,
+    "class_0_f1": 0.018142036648737352,
+    "class_1_precision": 0.9944086056716223,
+    "class_1_recall": 0.853456149965572,
+    "class_1_f1": 0.9185565529079923,
+    "balanced_accuracy": 0.5395398663660059,
+    "matthews_corrcoef": 0.017470421388939852,
     "positive_prevalence": 0.006158873805932629,
-    "threshold": 0.9896088147404654,
-    "brier_score": 0.006125273266540271,
-    "log_loss": 0.0377965458860599,
-    "expected_calibration_error": 0.002803543667709359,
+    "threshold": 0.9895158968760775,
+    "brier_score": 0.006134003498192755,
+    "log_loss": 0.03826568708886363,
+    "expected_calibration_error": 0.0037889687097918774,
     "prior_dummy_brier_score": 0.006126062211326088,
     "prior_dummy_log_loss": 0.03782585269030034,
-    "mean_predicted_repeat_probability": 0.008689282562577711,
-    "predicted_to_observed_rate_ratio": 1.4108557564871076,
+    "mean_predicted_repeat_probability": 0.009947842515724507,
+    "predicted_to_observed_rate_ratio": 1.6152047970429424,
     "dummy_baseline_pr_auc": 0.006158873805932629,
     "recency_baseline_pr_auc": 0.00792794178145024,
     "frequency_baseline_pr_auc": 0.008910984292957296,
     "lifetime_frequency_baseline_pr_auc": 0.01665442870180871,
-    "pr_auc_lift_over_dummy": 0.0065112565974431635
+    "pr_auc_lift_over_dummy": 0.0043256589153510714
   },
   "test_capacity_metrics": {
     "5%": {
@@ -168,10 +200,10 @@
       "monthly_cohorts": 4,
       "snapshots_scored": 143208,
       "customers_contacted": 7162,
-      "true_repeat_purchases_captured": 96,
-      "precision": 0.013404077073443172,
-      "recall": 0.10884353741496598,
-      "lift_over_monthly_prevalence": 2.176384432577834,
+      "true_repeat_purchases_captured": 87,
+      "precision": 0.012147444847807875,
+      "recall": 0.09863945578231292,
+      "lift_over_monthly_prevalence": 1.9723483920236624,
       "overall_repeat_purchase_prevalence": 0.006158873805932629
     },
     "10%": {
@@ -179,10 +211,10 @@
       "monthly_cohorts": 4,
       "snapshots_scored": 143208,
       "customers_contacted": 14322,
-      "true_repeat_purchases_captured": 169,
-      "precision": 0.011800027929060188,
-      "recall": 0.19160997732426305,
-      "lift_over_monthly_prevalence": 1.9159392286449561,
+      "true_repeat_purchases_captured": 145,
+      "precision": 0.010124284317832705,
+      "recall": 0.16439909297052155,
+      "lift_over_monthly_prevalence": 1.643853184340347,
       "overall_repeat_purchase_prevalence": 0.006158873805932629
     },
     "20%": {
@@ -190,10 +222,10 @@
       "monthly_cohorts": 4,
       "snapshots_scored": 143208,
       "customers_contacted": 28643,
-      "true_repeat_purchases_captured": 264,
-      "precision": 0.00921691163635094,
-      "recall": 0.29931972789115646,
-      "lift_over_monthly_prevalence": 1.4965254893634303,
+      "true_repeat_purchases_captured": 249,
+      "precision": 0.008693223475194637,
+      "recall": 0.282312925170068,
+      "lift_over_monthly_prevalence": 1.4114956320132355,
       "overall_repeat_purchase_prevalence": 0.006158873805932629
     }
   },
@@ -305,8 +337,8 @@
     }
   },
   "customer_cluster_bootstrap_pr_auc_ci95": {
-    "lower_95": 0.009483198207788,
-    "upper_95": 0.01835291160994996,
+    "lower_95": 0.008271680162531206,
+    "upper_95": 0.014606072753147422,
     "valid_replicates": 200
   },
   "unseen_customer_test_metrics": {
@@ -314,18 +346,18 @@
     "customers": 39644,
     "positive_count": 682,
     "positive_prevalence": 0.0059455830943185685,
-    "pr_auc": 0.009720426009443684,
-    "roc_auc": 0.5199271587943427,
-    "precision_at_10pct_capacity": 0.009239888423988842
+    "pr_auc": 0.008461583529401559,
+    "roc_auc": 0.5431617416821567,
+    "precision_at_10pct_capacity": 0.007235006973500697
   },
   "known_customer_test_metrics": {
     "rows": 28501,
     "customers": 14573,
     "positive_count": 200,
     "positive_prevalence": 0.007017297638679344,
-    "pr_auc": 0.029055939363278716,
-    "roc_auc": 0.6680537790184092,
-    "precision_at_10pct_capacity": 0.019642230796211857
+    "pr_auc": 0.02328601953188248,
+    "roc_auc": 0.5715938482739126,
+    "precision_at_10pct_capacity": 0.015433181339880744
   },
   "baseline_metrics": {
     "prior_dummy_pr_auc": 0.006158873805932629,
@@ -338,7 +370,7 @@
     "test_pr_auc": 0.006158873805932629,
     "test_positive_prevalence": 0.006158873805932629
   },
-  "model_sha256": "804b6e1ec30aa88f8d521bef8eb23d8d65c9d893f006692efcb4c446afd8890e",
+  "model_sha256": "4e6e655fc9eb6b3b250848bda02d4ac118d0be47417a9937a36a372364a5c81b",
   "artifacts": {
     "model": "models/best_churn_model.joblib",
     "comparison": "models/model_comparison.csv",
