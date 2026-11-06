@@ -16,7 +16,7 @@ concurrency:
 jobs:
   rebuild-train-and-commit:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 120
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       SUPABASE_DB_HOST: ${{ secrets.SUPABASE_DB_HOST }}
@@ -24,7 +24,9 @@ jobs:
       SUPABASE_DB_NAME: ${{ secrets.SUPABASE_DB_NAME }}
       SUPABASE_DB_USER: ${{ secrets.SUPABASE_DB_USER }}
       SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-      DB_CONNECT_TIMEOUT: "20"
+      # Connection secrets are read only from GitHub Actions repository secrets.
+      # Their values are never echoed in logs.
+      DB_CONNECT_TIMEOUT: "30"
       MLFLOW_EXPERIMENT_NAME: brazilian-ecommerce-churn-v3
     steps:
       - name: Checkout repair branch
