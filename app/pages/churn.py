@@ -197,6 +197,13 @@ def render() -> None:
         f"{bootstrap['lower_95']:.4f}–{bootstrap['upper_95']:.4f} "
         f"({bootstrap['replicates']} valid replicates)."
     )
+    top10_ci = metadata["customer_bootstrap_top10_95_ci"]
+    st.caption(
+        "Top-10% monthly policy — customer-cluster bootstrap 95% intervals: "
+        f"precision {top10_ci['precision']['lower_95']:.2%}–{top10_ci['precision']['upper_95']:.2%}; "
+        f"recall {top10_ci['recall']['lower_95']:.2%}–{top10_ci['recall']['upper_95']:.2%}; "
+        f"lift {top10_ci['lift']['lower_95']:.2f}x–{top10_ci['lift']['upper_95']:.2f}x."
+    )
     st.caption(
         f"PR-AUC vs prior baseline: {test_metrics['pr_auc_lift_over_dummy']:+.4f}; "
         f"PR-AUC / recency-only AP: {test_metrics['pr_auc_lift_over_recency']:.2f}x."
@@ -209,6 +216,14 @@ def render() -> None:
         metric_card("Log loss", f"{test_metrics['log_loss']:.4f}", help_text="Lower is better")
     with calibration_columns[2]:
         metric_card("Brier skill score", f"{test_metrics['brier_skill_score']:.3f}", help_text="Positive means better than the prevalence-only forecast")
+
+    discrimination_columns = st.columns(3)
+    with discrimination_columns[0]:
+        metric_card("Gini", f"{test_metrics['gini']:.3f}", help_text="2 × ROC-AUC − 1")
+    with discrimination_columns[1]:
+        metric_card("KS statistic", f"{test_metrics['ks_statistic']:.3f}", help_text="Maximum separation between positive and negative score distributions")
+    with discrimination_columns[2]:
+        metric_card("Expected calibration error", f"{test_metrics['expected_calibration_error']:.4f}", help_text="Lower is better; weighted absolute gap across calibration deciles")
 
     calibration_path = ROOT / "models" / "test_calibration.csv"
     if calibration_path.exists():
