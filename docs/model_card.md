@@ -26,7 +26,7 @@ days after the snapshot. A purchase exactly on the 90-day boundary is outside.
 
 Historical order activity is restricted to the 180 days before the snapshot.
 Orders must already have been delivered by the snapshot. Review scores are
-included only when their review-creation timestamps precede the snapshot.
+included only when their review-answer timestamps precede the snapshot.
 Future observations are used only to construct the target.
 
 ## Models and evaluation
