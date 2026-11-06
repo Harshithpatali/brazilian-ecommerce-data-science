@@ -79,3 +79,18 @@ def test_customer_cluster_bootstrap_returns_ordered_finite_interval():
 
     assert interval["valid_replicates"] > 0
     assert 0.0 <= interval["lower_95"] <= interval["upper_95"] <= 1.0
+
+
+
+def test_equal_frequency_calibration_bins_have_balanced_support():
+    from src.models.train_churn import _calibration_bins, _expected_calibration_error
+
+    y = np.array([0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 1, 0])
+    p = np.array([0.001, 0.002, 0.003, 0.004, 0.005, 0.006,
+                  0.007, 0.008, 0.009, 0.010, 0.011, 0.012])
+    bins = _calibration_bins(y, p, n_bins=4)
+
+    assert len(bins) == 4
+    assert bins["count"].max() - bins["count"].min() <= 1
+    assert bins["count"].sum() == len(y)
+    assert 0 <= _expected_calibration_error(y, p, n_bins=4) <= 1
