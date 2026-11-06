@@ -60,10 +60,13 @@ validation block.
 Customers may occur in earlier and later periods; this measures future
 predictions for known customers, matching the intended use case.
 
-The candidate model is selected by mean CV average precision (PR-AUC).
-The threshold is selected by maximizing F1 on the separate validation period.
-Since no business cost matrix is supplied, this is a technical proxy rather
-than a proven profit-maximizing intervention threshold.
+The candidate model is selected by mean CV average precision (PR-AUC) for the
+minority event: a delivered purchase within 90 days (SQL `churned = 0`). This
+avoids optimizing PR-AUC for the 97% majority no-purchase class. The threshold
+is selected by maximizing F1 for repeat purchase on the separate validation
+period; the equivalent complementary churn-probability cutoff is stored for
+risk scoring. Since no business cost matrix is supplied, this is a technical
+proxy rather than a proven profit-maximizing intervention threshold.
 
 The frozen model and threshold are evaluated once on the final chronological
 holdout. A 90-day embargo separates validation labels from final-test snapshots.
@@ -71,9 +74,24 @@ The holdout is not used for model or threshold selection.
 
 ## Imbalance and baseline reporting
 
-Report class counts and prevalence for each partition, average precision,
-ROC-AUC, per-class precision/recall/F1, balanced accuracy, Matthews correlation coefficient, confusion matrix, classification
-report, and a DummyClassifier prior-probability average-precision baseline.
+The database rebuild used for this project produced 10,570 customer-month
+snapshots across 2,374 customers and 21 snapshot months. There were 306
+snapshots with a delivered purchase in the following 90 days (2.89%) and
+10,264 without one (97.11%). These counts describe the full rebuilt dataset,
+not the final test-set distribution.
+
+Because no-purchase is the majority class, model selection and PR-AUC focus on
+the minority repeat-purchase event (`1 - churned`). The fitted model still
+outputs `P(churned)`; repeat-purchase probability is its complement. The
+validation repeat-purchase threshold is converted to a complementary churn
+probability cutoff for the dashboard.
+
+Report class counts and prevalence for each partition, average precision for
+repeat purchase, ROC-AUC, per-class precision/recall/F1, balanced accuracy,
+Matthews correlation coefficient, confusion matrix, classification report,
+and a DummyClassifier prior-probability average-precision baseline. Compare
+repeat-purchase PR-AUC with its prevalence baseline, not with the majority
+churn prevalence.
 
 Interpret average precision relative to positive-class prevalence. A high
 PR-AUC alone is not evidence of useful discrimination when positives are common.

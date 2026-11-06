@@ -1,0 +1,140 @@
+name: Rebuild and retrain customer churn
+
+on:
+  push:
+    branches:
+      - fix/churn-dashboard-and-data-contracts
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: churn-rebuild-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rebuild-train-and-commit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      SUPABASE_DB_HOST: ${{ secrets.SUPABASE_DB_HOST }}
+      SUPABASE_DB_PORT: ${{ secrets.SUPABASE_DB_PORT }}
+      SUPABASE_DB_NAME: ${{ secrets.SUPABASE_DB_NAME }}
+      SUPABASE_DB_USER: ${{ secrets.SUPABASE_DB_USER }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      # Connection secrets are read only from GitHub Actions repository secrets.
+      # Their values are never echoed in logs.
+      DB_CONNECT_TIMEOUT: "30"
+      MLFLOW_EXPERIMENT_NAME: brazilian-ecommerce-churn-v3
+    steps:
+      - name: Checkout repair branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/churn-dashboard-and-data-contracts
+          fetch-depth: 0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install project dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run unit and regression tests before database changes
+        run: pytest -q
+
+      - name: Verify database credentials are available
+        shell: bash
+        run: |
+          if [[ -z "$DATABASE_URL" ]]; then
+            required=(SUPABASE_DB_HOST SUPABASE_DB_USER SUPABASE_DB_PASSWORD)
+            missing=()
+            for name in "${required[@]}"; do
+              if [[ -z "${!name}" ]]; then missing+=("$name"); fi
+            done
+            if (( ${#missing[@]} > 0 )); then
+              echo "::error::Missing GitHub Actions secrets. Configure DATABASE_URL, or configure all of SUPABASE_DB_HOST, SUPABASE_DB_USER, and SUPABASE_DB_PASSWORD in repository Settings > Secrets and variables > Actions."
+              exit 1
+            fi
+          fi
+          echo "A database connection configuration is present. Secret values are not printed."
+
+      - name: Read-only Olist source schema preflight
+        run: python -m scripts.check_source_schema
+
+      - name: Rebuild derived point-in-time churn tables
+        run: python -m scripts.refresh_ml_sql
+
+      - name: Validate target, feature cutoff, review timing and snapshot grain
+        run: python -m scripts.validate_churn_data
+
+      - name: Export dataset, tune models and produce v3 artifacts
+        run: python -m scripts.run_ml
+
+      - name: Verify v3 metadata and model fingerprint
+        shell: bash
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+
+          from src.models.model_contract import validate_model_metadata
+
+          metadata = json.loads(Path("models/model_metadata.json").read_text(encoding="utf-8"))
+          errors = validate_model_metadata(metadata)
+          if errors:
+              raise SystemExit("Model artifact contract failed:\n- " + "\n- ".join(errors))
+
+          model_path = Path("models/best_churn_model.joblib")
+          actual_hash = hashlib.sha256(model_path.read_bytes()).hexdigest()
+          if actual_hash != metadata["model_sha256"]:
+              raise SystemExit("Trained model SHA-256 does not match metadata.")
+
+          dataset_path = Path("data/ml/customer_churn_dataset.parquet")
+          if not dataset_path.exists() or dataset_path.stat().st_size == 0:
+              raise SystemExit("Refreshed churn dataset is missing or empty.")
+
+          print("v3 model contract passed.")
+          print(f"Selected model: {metadata['selected_model']}")
+          print(f"Final test metrics: {json.dumps(metadata['test_metrics'], sort_keys=True)}")
+          print(f"Dataset rows: {metadata['class_distribution']['all']}")
+          PY
+
+      - name: Commit refreshed dataset and model artifacts
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            data/ml/customer_churn_dataset.parquet \
+            models/best_churn_model.joblib \
+            models/model_metadata.json \
+            models/model_comparison.csv \
+            models/test_confusion_matrix.json \
+            models/test_precision_recall_curve.csv
+          if git diff --cached --quiet; then
+            echo "No generated artifacts changed."
+          else
+            git commit -m "Retrain and publish validated churn v3 artifacts"
+            git push origin HEAD:fix/churn-dashboard-and-data-contracts
+          fi
+
+      - name: Publish run summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Customer churn v3 rebuild"
+            echo "- Branch: fix/churn-dashboard-and-data-contracts"
+            echo "- Database preflight, SQL validation, model training, artifact verification and commit are executed as separate stages."
+            if [[ -f models/model_metadata.json ]]; then
+              echo "- Model metadata file exists in the runner."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

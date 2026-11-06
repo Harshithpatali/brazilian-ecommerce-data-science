@@ -9,31 +9,36 @@ def valid_metadata():
         "pipeline_status": "ready",
         "model_version": MODEL_VERSION,
         "feature_columns": FEATURE_COLS,
+        "evaluation_positive_class": "purchase_within_90_days (SQL churned=0)",
+        "repeat_purchase_probability_threshold": 0.03,
         "feature_availability": {
             "review_score": "review_answer_timestamp < snapshot_date"
         },
         "model_sha256": "a" * 64,
-        "threshold": 0.44,
+        "threshold": 0.97,
         "test_metrics": {
             "roc_auc": 0.72,
             "pr_auc": 0.63,
-            "precision": 0.70,
-            "recall": 0.60,
-            "f1": 0.65,
+            "precision": 0.40,
+            "recall": 0.45,
+            "f1": 0.42,
             "class_0_precision": 0.40,
             "class_0_recall": 0.45,
             "class_0_f1": 0.42,
+            "class_1_precision": 0.95,
+            "class_1_recall": 0.85,
+            "class_1_f1": 0.90,
             "balanced_accuracy": 0.70,
             "matthews_corrcoef": 0.35,
-            "positive_prevalence": 0.58,
-            "threshold": 0.44,
-            "dummy_baseline_pr_auc": 0.58,
-            "pr_auc_lift_over_dummy": 0.05,
+            "positive_prevalence": 0.36363636363636365,
+            "threshold": 0.97,
+            "dummy_baseline_pr_auc": 0.36363636363636365,
+            "pr_auc_lift_over_dummy": 0.26636363636363636,
         },
         "dummy_baseline": {
             "strategy": "prior",
-            "test_pr_auc": 0.58,
-            "test_positive_prevalence": 0.58,
+            "test_pr_auc": 0.36363636363636365,
+            "test_positive_prevalence": 0.36363636363636365,
         },
         "class_distribution": {
             "train": {"0": 100, "1": 150},
@@ -113,3 +118,25 @@ def test_dummy_baseline_and_lift_must_be_consistent():
     metadata = valid_metadata()
     metadata["test_metrics"]["pr_auc_lift_over_dummy"] = 0.10
     assert any("PR-AUC lift is inconsistent" in error for error in validate_model_metadata(metadata))
+
+
+
+def test_evaluation_positive_class_must_be_minority_repeat_purchase():
+    metadata = valid_metadata()
+    metadata["evaluation_positive_class"] = "churned"
+    assert any("evaluation_positive_class" in error for error in validate_model_metadata(metadata))
+
+
+def test_repeat_purchase_threshold_is_required_and_bounded():
+    metadata = valid_metadata()
+    metadata["repeat_purchase_probability_threshold"] = 1.5
+    assert any("repeat_purchase_probability_threshold" in error for error in validate_model_metadata(metadata))
+
+
+
+def test_churn_and_repeat_probability_thresholds_must_be_complements():
+    metadata = valid_metadata()
+    metadata["threshold"] = 0.90
+    metadata["test_metrics"]["threshold"] = 0.90
+    errors = validate_model_metadata(metadata)
+    assert any("must be complementary" in error for error in errors)

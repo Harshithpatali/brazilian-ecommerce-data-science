@@ -254,9 +254,21 @@ Every script is designed to be **rerunnable against a live database** without ma
 - **Leakage control:** historical orders must be purchased and delivered before the snapshot; review scores are included only when `review_answer_timestamp` is before the snapshot, and multiple review rows are averaged within each order before customer-level aggregation. Future orders are used only to create the target. Snapshots without a complete 90-day future window are excluded.
 - **Features:** 30/90/180-day rolling order counts and revenue, average order value, average review score, average delivery delay, active months, recency, recent order/revenue share, orders per active month, revenue per order, and recent-vs-older order ratio.
 
+### Class imbalance and evaluation target
+
+The rebuilt point-in-time dataset contains **10,570 customer-month snapshots**
+across 2,374 customers. Only **306 snapshots (2.89%)** have a delivered
+purchase in the following 90 days; 10,264 (97.11%) do not. These are full
+dataset counts, not holdout metrics. Because no-purchase is the majority
+class, model selection and PR-AUC focus on the minority event—purchase within
+90 days (`churned = 0`). The model still predicts churn probability; repeat-
+purchase probability is its complement. The validation F1 threshold for
+repeat purchase is converted to a complementary churn-risk cutoff for the
+dashboard.
+
 ### Model comparison
 
-Two model families are tuned with **expanding-window temporal cross-validation grouped by unique snapshot dates**, a 90-day embargo between fold periods, and GridSearchCV, optimizing average precision (PR-AUC):
+Two model families are tuned with **expanding-window temporal cross-validation grouped by unique snapshot dates**, a 90-day embargo between fold periods, and GridSearchCV. Model selection optimizes average precision (PR-AUC) for the minority event: a delivered purchase within 90 days (`churned = 0`), not the 97% majority no-purchase class.
 
 | # | Model | Type | Why it's included |
 |---|---|---|---|
@@ -271,7 +283,7 @@ flowchart LR
     C --> D3[HistGradientBoosting]
     D1 --> E["Select using mean CV PR-AUC"]
     D3 --> E
-    E --> V["Choose threshold on validation<br/>by maximum F1"]
+    E --> V["Choose threshold on validation<br/>by repeat-purchase F1"]
     V --> T["Evaluate frozen model once<br/>on final chronological test"]
     T --> G[("models/best_churn_model.joblib")]
     C -.logged to.-> M[("MLflow<br/>Tracking Server")]
@@ -283,7 +295,7 @@ flowchart LR
 
 The performance-optimized build first materializes delivered orders into a compact `ml.delivered_orders` table, aggregates to `ml.customer_monthly_activity`, and only then constructs the point-in-time dataset — avoiding an expensive snapshot × full-order-history join and reducing the risk of Supabase statement timeouts on large SQL builds.
 
-Temporal-CV runs, hyperparameters and final selected-model evaluation are tracked with **MLflow**. The selected pipeline is persisted to `models/best_churn_model.joblib` and loaded directly by Streamlit — no separate model-serving API is required. Model selection uses cross-validation PR-AUC; validation selects the F1 threshold; the final test period is evaluated once. Reports include class-specific metrics, balanced accuracy and Matthews correlation coefficient. A 90-day purge prevents training/validation label windows from overlapping the next period.
+Temporal-CV runs, hyperparameters and final selected-model evaluation are tracked with **MLflow**. The selected pipeline is persisted to `models/best_churn_model.joblib` and loaded directly by Streamlit — no separate model-serving API is required. Model selection uses cross-validation PR-AUC for repeat purchase within 90 days (the minority event); validation selects its F1 threshold; the final test period is evaluated once. The dashboard reports the complementary churn-risk cutoff. Reports include class-specific metrics, balanced accuracy and Matthews correlation coefficient. A 90-day purge prevents training/validation label windows from overlapping the next period.
 
 See [`docs/churn_methodology.md`](docs/churn_methodology.md), [`docs/ml_modeling.md`](docs/ml_modeling.md), and [`docs/model_card.md`](docs/model_card.md) for full details, including known limitations.
 
@@ -490,7 +502,7 @@ The test suite includes connection and feature-contract checks, target-boundary 
 - Customer segmentation (RFM) and cohort retention analysis
 - Rigorous statistical hypothesis testing
 - Leakage-safe, point-in-time feature engineering for time-aware ML
-- Model comparison using date-grouped temporal cross-validation, untouched final holdout evaluation, a prior-probability baseline, and MLflow tracking
+- Model comparison using date-grouped temporal cross-validation optimized for minority-class repeat purchase, an untouched final holdout, a prevalence-matched prior baseline, and MLflow tracking
 - Production-style project structure: reproducible SQL builds, CLI scripts, tests, docs
 - End-to-end delivery as a live, interactive business dashboard (Streamlit)
 

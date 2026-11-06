@@ -1,5 +1,110 @@
 {
-  "pipeline_status": "stale_requires_retraining",
-  "model_version": "legacy-before-churn-pit-v3",
-  "note": "This checked-in model metadata and binary were produced before the point-in-time target and date-grouped temporal evaluation corrections. Rebuild the SQL dataset and run scripts.run_ml to generate validated artifacts. The dashboard intentionally refuses to serve this legacy model."
+  "pipeline_status": "ready",
+  "model_version": "churn-pit-v3",
+  "experiment_name": "brazilian-ecommerce-churn-v3",
+  "tracking_uri": "file:///home/runner/work/brazilian-ecommerce-data-science/brazilian-ecommerce-data-science/mlruns",
+  "selected_model": "logistic_regression",
+  "selection_metric": "cv_average_precision_for_purchase_within_90_days",
+  "best_params": {
+    "model__C": 0.2,
+    "model__solver": "liblinear"
+  },
+  "threshold": 0.2537247034268006,
+  "threshold_selection": "maximum F1 for purchase_within_90_days on separate validation period",
+  "repeat_purchase_probability_threshold": 0.7462752965731995,
+  "evaluation_positive_class": "purchase_within_90_days (SQL churned=0)",
+  "threshold_validation_metrics": {
+    "precision": 0.16279069767441862,
+    "recall": 0.12727272727272726,
+    "f1": 0.14285714285714285,
+    "repeat_purchase_probability_threshold": 0.7462752965731995
+  },
+  "target_definition": "1 when no eventually-delivered order has a purchase timestamp in [snapshot_date, snapshot_date + 90 days); otherwise 0.",
+  "feature_columns": [
+    "orders_180d",
+    "orders_90d",
+    "orders_30d",
+    "revenue_180d",
+    "revenue_90d",
+    "revenue_30d",
+    "avg_order_value_180d",
+    "avg_review_score_180d",
+    "avg_delivery_delay_180d",
+    "active_months_180d",
+    "recency_days",
+    "recent_order_share",
+    "recent_revenue_share",
+    "orders_per_active_month",
+    "revenue_per_order",
+    "recent_vs_older_order_ratio"
+  ],
+  "feature_availability": {
+    "historical_orders": "order_purchase_timestamp < snapshot_date and order_delivered_customer_date < snapshot_date",
+    "review_score": "review_answer_timestamp < snapshot_date",
+    "future_orders": "used only to construct the target, never as predictors"
+  },
+  "feature_window_days": 180,
+  "prediction_window_days": 90,
+  "label_horizon_embargo_days": 90,
+  "evaluation_design": "Unique snapshot dates split chronologically into train, validation and final test with a 90-day embargo at period boundaries; CV folds are grouped by unique date and purge overlapping 90-day label windows. Customers can appear in earlier and later periods because the use case is future scoring of known customers.",
+  "periods": {
+    "train_start": "2016-11-01",
+    "train_end": "2017-09-01",
+    "validation_start": "2017-12-01",
+    "validation_end": "2018-01-01",
+    "test_start": "2018-04-01",
+    "test_end": "2018-07-01",
+    "label_horizon_embargo_days": "90"
+  },
+  "class_distribution": {
+    "all": {
+      "0": 306,
+      "1": 10264
+    },
+    "train": {
+      "0": 41,
+      "1": 1461
+    },
+    "validation": {
+      "0": 55,
+      "1": 1424
+    },
+    "test": {
+      "0": 112,
+      "1": 4508
+    }
+  },
+  "test_metrics": {
+    "roc_auc": 0.6238670934212194,
+    "pr_auc": 0.03771882687101569,
+    "precision": 0.058394160583941604,
+    "recall": 0.07142857142857142,
+    "f1": 0.0642570281124498,
+    "class_0_precision": 0.058394160583941604,
+    "class_0_recall": 0.07142857142857142,
+    "class_0_f1": 0.0642570281124498,
+    "class_1_precision": 0.9768012491635066,
+    "class_1_recall": 0.9713842058562555,
+    "class_1_f1": 0.9740851963074185,
+    "balanced_accuracy": 0.5214063886424135,
+    "matthews_corrcoef": 0.03881769234467355,
+    "positive_prevalence": 0.024242424242424242,
+    "threshold": 0.2537247034268006,
+    "dummy_baseline_pr_auc": 0.024242424242424242,
+    "pr_auc_lift_over_dummy": 0.013476402628591445
+  },
+  "dummy_baseline": {
+    "strategy": "prior",
+    "test_pr_auc": 0.024242424242424242,
+    "test_positive_prevalence": 0.024242424242424242
+  },
+  "model_sha256": "3052bde065283a08fc5228405cf2c9d9197ba59fac90dd889c4c3d0a207f7c61",
+  "artifacts": {
+    "model": "models/best_churn_model.joblib",
+    "comparison": "models/model_comparison.csv",
+    "test_predictions": "models/test_predictions.parquet",
+    "classification_report": "models/test_classification_report.json",
+    "confusion_matrix": "models/test_confusion_matrix.json",
+    "precision_recall_curve": "models/test_precision_recall_curve.csv"
+  }
 }

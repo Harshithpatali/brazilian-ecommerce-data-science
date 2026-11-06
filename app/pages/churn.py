@@ -122,7 +122,7 @@ def render() -> None:
 
     columns = st.columns(4)
     cards = [
-        ("Selected Model", metadata.get("selected_model", "N/A"), "Selected by temporal CV PR-AUC", "blue"),
+        ("Selected Model", metadata.get("selected_model", "N/A"), "Selected by temporal CV repeat-purchase PR-AUC", "blue"),
         ("Latest Snapshot", str(latest_date.date()), "Historical prediction population", "violet"),
         ("Average Predicted Risk", f"{latest['churn_probability'].mean():.1%}", "Latest snapshot", "teal"),
         ("Customers Above Threshold", f"{len(high_risk):,}", f"Risk ≥ {threshold:.1%}", "amber"),
@@ -139,10 +139,10 @@ def render() -> None:
     )
     metric_columns = st.columns(4)
     values = [
-        ("Test PR-AUC", test_metrics.get("pr_auc"), "Average precision"),
-        ("Dummy PR-AUC", baseline.get("test_pr_auc"), "Prior-probability baseline"),
-        ("Test ROC-AUC", test_metrics.get("roc_auc"), "Threshold independent"),
-        ("Test F1", test_metrics.get("f1"), f"Validation threshold {threshold:.3f}"),
+        ("Repeat-purchase PR-AUC", test_metrics.get("pr_auc"), "Positive class: delivered purchase within 90 days"),
+        ("Dummy repeat-purchase PR-AUC", baseline.get("test_pr_auc"), "Prior-probability baseline"),
+        ("Repeat-purchase ROC-AUC", test_metrics.get("roc_auc"), "Threshold independent"),
+        ("Repeat-purchase F1", test_metrics.get("class_0_f1"), f"Validation churn cutoff {threshold:.3f}"),
     ]
     for column, (label, value, help_text) in zip(metric_columns, values):
         with column:
@@ -150,7 +150,7 @@ def render() -> None:
 
     section_title(
         "Per-class test performance",
-        "Class 0 is a delivered purchase within 90 days; class 1 is no delivered purchase.",
+        "Evaluation focuses on the minority event: class 0 (delivered purchase within 90 days). Class 1 is no delivered purchase.",
     )
     class_report = pd.DataFrame([
         {
@@ -161,9 +161,9 @@ def render() -> None:
         },
         {
             "Class": "No delivered purchase (1)",
-            "Precision": test_metrics["precision"],
-            "Recall": test_metrics["recall"],
-            "F1": test_metrics["f1"],
+            "Precision": test_metrics["class_1_precision"],
+            "Recall": test_metrics["class_1_recall"],
+            "F1": test_metrics["class_1_f1"],
         },
     ])
     st.dataframe(
@@ -188,7 +188,7 @@ def render() -> None:
         )
     prevalence = baseline.get("test_positive_prevalence")
     if prevalence is not None:
-        st.caption(f"Test positive prevalence: {float(prevalence):.1%}. Interpret PR-AUC relative to this baseline.")
+        st.caption(f"Test repeat-purchase prevalence (SQL churned=0): {float(prevalence):.1%}. Interpret repeat-purchase PR-AUC relative to this baseline.")
     if test_metrics.get("pr_auc_lift_over_dummy") is not None:
         st.caption(
             f"PR-AUC lift over the prior-probability baseline: "
@@ -240,25 +240,25 @@ def render() -> None:
     pr_curve_path = ROOT / "models" / "test_precision_recall_curve.csv"
     if pr_curve_path.exists():
         pr_curve = pd.read_csv(pr_curve_path)
-        if {"threshold", "precision", "recall"}.issubset(pr_curve.columns) and not pr_curve.empty:
+        if {"repeat_purchase_probability_threshold", "precision", "recall"}.issubset(pr_curve.columns) and not pr_curve.empty:
             section_title(
                 "Final test precision-recall curve",
                 "This curve is generated from the final holdout. Use it to inspect "
-                "the precision/recall trade-off across thresholds.",
+                "the precision/recall trade-off across repeat-purchase probability thresholds.",
             )
-            pr_curve = pr_curve.sort_values("threshold")
+            pr_curve = pr_curve.sort_values("repeat_purchase_probability_threshold")
             st.line_chart(
-                pr_curve.set_index("threshold")[["precision", "recall"]],
+                pr_curve.set_index("repeat_purchase_probability_threshold")[["precision", "recall"]],
                 use_container_width=True,
             )
 
     comparison = load_comparison()
     section_title(
         "Candidate model comparison",
-        "Models are ranked by expanding-window cross-validation PR-AUC; the final test set is not used for selection.",
+        "Models are ranked by expanding-window cross-validation PR-AUC for the minority repeat-purchase event; the final test set is not used for selection.",
     )
     if not comparison.empty:
-        show = [c for c in ["model", "cv_pr_auc", "selected", "best_params"] if c in comparison.columns]
+        show = [c for c in ["model", "cv_repeat_purchase_pr_auc", "selected", "best_params"] if c in comparison.columns]
         st.dataframe(comparison[show], use_container_width=True, hide_index=True)
 
     section_title(
@@ -278,10 +278,10 @@ def render() -> None:
 
     section_title(
         "Intervention threshold",
-        "Default threshold maximizes F1 on the separate validation period. Changing this control only changes the displayed customer count.",
+        "The churn cutoff is the complement of the repeat-purchase probability threshold selected by validation F1. Changing this control only changes the displayed customer count.",
     )
     threshold_view = st.slider(
-        "Probability threshold", min_value=0.01, max_value=0.99,
+        "Churn probability threshold", min_value=0.01, max_value=0.99,
         value=float(max(0.01, min(0.99, threshold))), step=0.01,
     )
     count = int((latest["churn_probability"] >= threshold_view).sum())
@@ -290,6 +290,8 @@ def render() -> None:
     with st.expander("Evaluation and methodology"):
         st.write(metadata.get("target_definition", ""))
         st.write(metadata.get("evaluation_design", ""))
+        st.write(f"PR-AUC positive class: {metadata.get('evaluation_positive_class', 'not specified')}")
+        st.write(f"Repeat-purchase probability threshold: {metadata.get('repeat_purchase_probability_threshold', 'not available')}")
         st.write(
             "F1-based threshold selection is a technical proxy, not a business-optimal "
             "retention policy until intervention costs and customer value are specified."

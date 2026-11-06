@@ -2,10 +2,10 @@
 
 ## Status
 
-The corrected pipeline version is churn-pit-v3. Existing checked-in model
-artifacts were generated before the corrected target and evaluation protocol.
-They must be regenerated from the configured PostgreSQL database before the
-dashboard can serve the updated churn model.
+The corrected pipeline version is \`churn-pit-v3\`. Existing checked-in model
+artifacts predate the corrected target and evaluation protocol. They must be
+regenerated from the configured PostgreSQL database before the dashboard can
+serve the updated churn model.
 
 ## Intended use
 
@@ -18,7 +18,7 @@ service or make consequential decisions about customers.
 
 ## Target
 
-churned = 1 when no eventually-delivered order has a purchase timestamp in
+\`churned = 1\` when no eventually-delivered order has a purchase timestamp in
 the half-open interval from the snapshot date up to, but not including, 90
 days after the snapshot. A purchase exactly on the 90-day boundary is outside.
 
@@ -29,20 +29,26 @@ Orders must already have been delivered by the snapshot. Review scores are
 included only when their review-answer timestamps precede the snapshot.
 Future observations are used only to construct the target.
 
-## Models and evaluation
+## Class balance and evaluation
 
-Candidate models are Logistic Regression and HistGradientBoosting. Model family
-and hyperparameters are selected with expanding-window temporal CV grouped by
-unique snapshot dates. The threshold is selected on a separate validation
-period by maximizing F1. The final chronological holdout is evaluated once.
+The rebuilt dataset contains 306 repeat-purchase snapshots out of 10,570
+(2.89%); 97.11% have no delivered purchase in the next 90 days. Model family
+and hyperparameters are selected with expanding-window temporal CV average
+precision for the minority repeat-purchase event (\`churned = 0\`).
 
-Reports include class prevalence, average precision, ROC-AUC, per-class
+The estimator outputs churn probability; repeat-purchase probability is its
+complement. The repeat-purchase threshold is selected on a separate validation
+period by maximum F1 and converted to the complementary churn-probability
+cutoff for the risk-scoring dashboard.
+
+Reports include repeat-purchase prevalence, PR-AUC, ROC-AUC, both classes'
 precision/recall/F1, balanced accuracy, Matthews correlation coefficient,
-confusion matrix, and prior-probability dummy baseline.
+confusion matrix, and a prior-probability dummy baseline. PR-AUC must be
+compared with repeat-purchase prevalence.
 
 ## Limitations
 
-- The evaluation allows customers in earlier training periods and later
+- Evaluation allows customers in earlier training periods and later
   evaluation periods. It measures future prediction for known customers,
   not unseen-customer generalization.
 - Eventual delivery status is used retrospectively to define delivered events.
