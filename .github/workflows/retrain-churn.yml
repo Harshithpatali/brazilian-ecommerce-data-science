@@ -7,8 +7,6 @@ on:
     paths:
       - ".github/workflows/retrain-churn.yml"
       - "app/**"
-      - "docs/**"
-      - "README.md"
       - "requirements.txt"
       - "scripts/**"
       - "sql/**"
@@ -37,7 +35,7 @@ jobs:
       # Connection secrets are read only from GitHub Actions repository secrets.
       # Their values are never echoed in logs.
       DB_CONNECT_TIMEOUT: "30"
-      MLFLOW_EXPERIMENT_NAME: brazilian-ecommerce-churn-v4
+      MLFLOW_EXPERIMENT_NAME: brazilian-ecommerce-churn-v5
     steps:
       - name: Checkout repair branch
         uses: actions/checkout@v4
@@ -84,10 +82,10 @@ jobs:
       - name: Validate target, feature cutoff, review timing and snapshot grain
         run: python -m scripts.validate_churn_data
 
-      - name: Export dataset, tune models and produce v4 artifacts
+      - name: Export dataset, tune models and produce v5 artifacts
         run: python -m scripts.run_ml
 
-      - name: Verify v4 metadata and model fingerprint
+      - name: Verify v5 metadata and model fingerprint
         shell: bash
         run: |
           python - <<'PY'
@@ -114,6 +112,8 @@ jobs:
           print("v4 model contract passed.")
           print(f"Selected model: {metadata['selected_model']}")
           print(f"Final test metrics: {json.dumps(metadata['test_metrics'], sort_keys=True)}")
+          print(f"Monthly contact-capacity metrics: {json.dumps(metadata['test_capacity_metrics'], sort_keys=True)}")
+          print(f"Customer-clustered PR-AUC interval: {json.dumps(metadata['customer_cluster_bootstrap_pr_auc_ci95'], sort_keys=True)}")
           print(f"Dataset rows: {metadata['class_distribution']['all']}")
           PY
 
@@ -128,7 +128,9 @@ jobs:
             models/model_metadata.json \
             models/model_comparison.csv \
             models/test_confusion_matrix.json \
-            models/test_precision_recall_curve.csv
+            models/test_precision_recall_curve.csv \
+            models/test_capacity_metrics.json \
+            models/test_calibration_bins.csv
           # Evaluation outputs are intentionally gitignored for routine runs;
           # publish the selected holdout predictions and class report explicitly.
           git add -f \
@@ -137,7 +139,7 @@ jobs:
           if git diff --cached --quiet; then
             echo "No generated artifacts changed."
           else
-            git commit -m "Retrain and publish validated churn v4 artifacts"
+            git commit -m "Retrain and publish validated churn v5 artifacts"
             git push origin HEAD:fix/churn-dashboard-and-data-contracts
           fi
 
