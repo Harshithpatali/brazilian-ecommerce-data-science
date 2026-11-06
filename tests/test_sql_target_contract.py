@@ -26,3 +26,11 @@ def test_sql_requires_full_future_observation_window():
     sql = SQL_PATH.read_text(encoding="utf-8")
     assert "generated.snapshot_timestamp + INTERVAL '90 days'" in sql
     assert "<= o.max_observed_purchase_timestamp" in sql
+
+
+
+def test_review_score_uses_answer_timestamp_and_order_weighting():
+    sql = SQL_PATH.read_text(encoding="utf-8")
+    assert "r.review_answer_timestamp < s.snapshot_date" in sql
+    assert "r.review_creation_date < s.snapshot_date" not in sql
+    assert "AVG(order_review.order_avg_review_score)" in sql
