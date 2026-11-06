@@ -37,7 +37,7 @@ jobs:
       DB_CONNECT_TIMEOUT: "30"
       MLFLOW_EXPERIMENT_NAME: brazilian-ecommerce-churn-v5
     steps:
-      - name: Checkout repair branch
+      - name: Checkout triggering branch
         uses: actions/checkout@v4
         with:
           ref: ${{ github.ref }}
