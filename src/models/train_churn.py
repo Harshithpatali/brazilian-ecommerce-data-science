@@ -727,8 +727,8 @@ def main() -> None:
     test_metrics["prior_dummy_log_loss"] = float(log_loss(
         y_test_repeat,
         np.column_stack([
-            np.full(len(y_test_repeat), prior_repeat_probability, dtype=float),
             np.full(len(y_test_repeat), 1.0 - prior_repeat_probability, dtype=float),
+            np.full(len(y_test_repeat), prior_repeat_probability, dtype=float),
         ]),
         labels=[0, 1],
     ))
