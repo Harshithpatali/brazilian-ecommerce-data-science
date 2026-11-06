@@ -135,14 +135,14 @@ def render() -> None:
     baseline = metadata.get("dummy_baseline", {})
     section_title(
         "Final chronological test evaluation",
-        "The selected model and threshold were frozen before this final holdout was evaluated.",
+        "The selected model and F2 threshold were frozen before this final holdout was evaluated.",
     )
     metric_columns = st.columns(4)
     values = [
         ("Repeat-purchase PR-AUC", test_metrics.get("pr_auc"), "Positive class: delivered purchase within 90 days"),
         ("Dummy repeat-purchase PR-AUC", baseline.get("test_pr_auc"), "Prior-probability baseline"),
         ("Repeat-purchase ROC-AUC", test_metrics.get("roc_auc"), "Threshold independent"),
-        ("Repeat-purchase F1", test_metrics.get("class_0_f1"), f"Validation churn cutoff {threshold:.3f}"),
+        ("Repeat-purchase F2", test_metrics.get("f2"), f"Validation-selected F2; churn cutoff {threshold:.3f}"),
     ]
     for column, (label, value, help_text) in zip(metric_columns, values):
         with column:
@@ -293,7 +293,7 @@ def render() -> None:
         st.write(f"PR-AUC positive class: {metadata.get('evaluation_positive_class', 'not specified')}")
         st.write(f"Repeat-purchase probability threshold: {metadata.get('repeat_purchase_probability_threshold', 'not available')}")
         st.write(
-            "F1-based threshold selection is a technical proxy, not a business-optimal "
+            "F2-based threshold selection favors repeat-purchase recall but remains a technical proxy, not a business-optimal "
             "retention policy until intervention costs and customer value are specified."
         )
         st.json({
