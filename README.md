@@ -252,7 +252,7 @@ Every script is designed to be **rerunnable against a live database** without ma
 - **Snapshot logic:** monthly snapshots begin after the customer's second delivered order. A snapshot is included only when the full 90-day forward observation window is present. All eligible snapshots remain in the dataset, allowing customers to reactivate after a period of inactivity.
 - **Target:** `churned = 1` when no eventually-delivered order has a purchase timestamp in the half-open interval `[snapshot_date, snapshot_date + 90 days)`. A purchase exactly at the 90-day boundary is outside the window.
 - **Leakage control:** historical orders must be purchased and delivered before the snapshot; review scores are included only when `review_answer_timestamp` is before the snapshot, and multiple review rows are averaged within each order before customer-level aggregation. Future orders are used only to create the target. Snapshots without a complete 90-day future window are excluded.
-- **Features:** 30/90/180-day rolling order counts and revenue, average order value, average review score, average delivery delay, active months, recency, recent order/revenue share, orders per active month, revenue per order, and recent-vs-older order ratio.
+- **Features:** 30/90/180-day order and revenue windows, prior-180-day activity, lifetime delivered-order count, customer tenure, average/median interpurchase gaps, gap variability, recency-to-cycle ratio, review score, delivery delay and purchase-frequency trends.
 
 ### Class imbalance and evaluation target
 
@@ -262,9 +262,9 @@ purchase in the following 90 days; 10,264 (97.11%) do not. These are full
 dataset counts, not holdout metrics. Because no-purchase is the majority
 class, model selection and PR-AUC focus on the minority event—purchase within
 90 days (`churned = 0`). The model still predicts churn probability; repeat-
-purchase probability is its complement. The validation F1 threshold for
-repeat purchase is converted to a complementary churn-risk cutoff for the
-dashboard.
+purchase probability is its complement. The validation F2 threshold for
+repeat purchase (beta=2, recall-weighted) is converted to a complementary
+churn-risk cutoff for the dashboard.
 
 ### Model comparison
 
@@ -274,6 +274,7 @@ Two model families are tuned with **expanding-window temporal cross-validation g
 |---|---|---|---|
 | 1 | **Logistic Regression** | Linear baseline | Interpretable coefficients, fast, strong sanity-check baseline |
 | 2 | **HistGradientBoosting** | Boosted trees | Captures nonlinear relationships in tabular data |
+| 3 | **Random Forest** | Bagged trees | Tests nonlinear interactions with shallow, regularized trees |
 
 ```mermaid
 flowchart LR
@@ -283,7 +284,7 @@ flowchart LR
     C --> D3[HistGradientBoosting]
     D1 --> E["Select using mean CV PR-AUC"]
     D3 --> E
-    E --> V["Choose threshold on validation<br/>by repeat-purchase F1"]
+    E --> V["Choose threshold on validation<br/>by repeat-purchase F2"]
     V --> T["Evaluate frozen model once<br/>on final chronological test"]
     T --> G[("models/best_churn_model.joblib")]
     C -.logged to.-> M[("MLflow<br/>Tracking Server")]
@@ -295,11 +296,11 @@ flowchart LR
 
 The performance-optimized build first materializes delivered orders into a compact `ml.delivered_orders` table, aggregates to `ml.customer_monthly_activity`, and only then constructs the point-in-time dataset — avoiding an expensive snapshot × full-order-history join and reducing the risk of Supabase statement timeouts on large SQL builds.
 
-Temporal-CV runs, hyperparameters and final selected-model evaluation are tracked with **MLflow**. The selected pipeline is persisted to `models/best_churn_model.joblib` and loaded directly by Streamlit — no separate model-serving API is required. Model selection uses cross-validation PR-AUC for repeat purchase within 90 days (the minority event); validation selects its F1 threshold; the final test period is evaluated once. The dashboard reports the complementary churn-risk cutoff. Reports include class-specific metrics, balanced accuracy and Matthews correlation coefficient. A 90-day purge prevents training/validation label windows from overlapping the next period.
+Temporal-CV runs, hyperparameters and final selected-model evaluation are tracked with **MLflow**. The selected pipeline is persisted to `models/best_churn_model.joblib` and loaded directly by Streamlit — no separate model-serving API is required. Model selection uses cross-validation PR-AUC for repeat purchase within 90 days (the minority event); validation selects its recall-oriented F2 threshold (beta=2); the final test period is evaluated once. The dashboard reports the complementary churn-risk cutoff. Reports include class-specific metrics, balanced accuracy and Matthews correlation coefficient. A 90-day purge prevents training/validation label windows from overlapping the next period.
 
 See [`docs/churn_methodology.md`](docs/churn_methodology.md), [`docs/ml_modeling.md`](docs/ml_modeling.md), and [`docs/model_card.md`](docs/model_card.md) for full details, including known limitations.
 
-> The model artifacts currently committed to the repository predate the corrected `churn-pit-v3` pipeline. The Churn page remains disabled until the PostgreSQL dataset is rebuilt and the corrected model artifacts are generated with `python -m scripts.run_ml`.
+> The model artifacts currently committed to the repository predate the corrected `churn-pit-v4` pipeline. The Churn page remains disabled until the PostgreSQL dataset is rebuilt and the corrected model artifacts are generated with `python -m scripts.run_ml`.
 
 ## 📊 Statistical Analysis
 
