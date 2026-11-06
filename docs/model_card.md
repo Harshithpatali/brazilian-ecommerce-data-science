@@ -36,8 +36,9 @@ and hyperparameters are selected with expanding-window temporal CV grouped by
 unique snapshot dates. The threshold is selected on a separate validation
 period by maximizing F1. The final chronological holdout is evaluated once.
 
-Reports include class prevalence, average precision, ROC-AUC, thresholded
-precision/recall/F1, confusion matrix, and prior-probability dummy baseline.
+Reports include class prevalence, average precision, ROC-AUC, per-class
+precision/recall/F1, balanced accuracy, Matthews correlation coefficient,
+confusion matrix, and prior-probability dummy baseline.
 
 ## Limitations
 
