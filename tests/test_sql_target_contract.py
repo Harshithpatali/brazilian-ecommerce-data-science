@@ -50,3 +50,12 @@ def test_history_features_are_restricted_to_orders_observable_before_snapshot():
     assert "orders_prior_180d" in sql
     assert "s.snapshot_date - INTERVAL '360 days'" in sql
     assert "s.snapshot_date - INTERVAL '180 days'" in sql
+
+
+
+def test_v5_cohort_starts_after_first_delivered_order_to_predict_second_purchase():
+    sql = SQL_PATH.read_text(encoding="utf-8")
+    assert "first_delivered AS" in sql
+    assert "WHERE delivered_order_number = 1" in sql
+    assert "second_delivered" not in sql
+    assert "after the first delivered order" in sql.lower()
