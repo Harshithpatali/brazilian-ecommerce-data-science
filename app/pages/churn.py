@@ -280,20 +280,34 @@ def render() -> None:
         "Precision@K and recall@K are measured by ranking customers separately within each monthly holdout cohort.",
     )
     capacity = metadata.get("test_capacity_metrics", {})
+    baseline_capacity = metadata.get("baseline_capacity_metrics", {})
     capacity_rows = []
     for label in ("5%", "10%", "20%"):
         values = capacity.get(label, {})
-        capacity_rows.append({
+        row = {
             "Monthly contact capacity": label,
-            "Precision": values.get("precision"),
-            "Recall captured": values.get("recall"),
-            "Lift over prevalence": values.get("lift_over_monthly_prevalence"),
-            "Customers contacted": values.get("customers_contacted"),
-        })
+            "Model precision": values.get("precision"),
+            "Model recall": values.get("recall"),
+            "Model lift": values.get("lift_over_monthly_prevalence"),
+            "Model contacts": values.get("customers_contacted"),
+        }
+        for baseline_name, display_name in (
+            ("recency_only", "Recency"),
+            ("orders_180d_only", "Recent frequency"),
+            ("lifetime_frequency_only", "Lifetime frequency"),
+        ):
+            row[f"{display_name} precision"] = baseline_capacity.get(
+                baseline_name, {}
+            ).get(label, {}).get("precision")
+        capacity_rows.append(row)
     st.dataframe(
         pd.DataFrame(capacity_rows).style.format({
-            "Precision": "{:.2%}", "Recall captured": "{:.2%}",
-            "Lift over prevalence": "{:.2f}x",
+            "Model precision": "{:.2%}",
+            "Model recall": "{:.2%}",
+            "Model lift": "{:.2f}x",
+            "Recency precision": "{:.2%}",
+            "Recent frequency precision": "{:.2%}",
+            "Lifetime frequency precision": "{:.2%}",
         }),
         use_container_width=True,
         hide_index=True,
