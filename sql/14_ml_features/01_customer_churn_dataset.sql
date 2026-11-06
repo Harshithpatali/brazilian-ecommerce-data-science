@@ -119,7 +119,20 @@ SELECT
     f.orders_180d,
     f.orders_90d,
     f.orders_30d,
+    prior.orders_prior_180d,
+    history.lifetime_delivered_orders,
+    history.customer_tenure_days,
+    history.positive_interpurchase_gap_count,
+    history.zero_interpurchase_gap_share,
+    history.avg_interpurchase_days,
+    history.median_interpurchase_days,
+    history.interpurchase_gap_cv,
+    history.recency_days::numeric
+        / NULLIF(history.avg_interpurchase_days, 0) AS recency_to_avg_interpurchase_ratio,
+    f.orders_180d::numeric / NULLIF(prior.orders_prior_180d, 0)
+        AS recent_vs_prior_order_frequency,
     f.revenue_180d,
+    prior.revenue_prior_180d,
     f.revenue_90d,
     f.revenue_30d,
     f.avg_order_value_180d,
@@ -184,6 +197,63 @@ CROSS JOIN LATERAL (
       AND d.order_purchase_timestamp < s.snapshot_date
       AND d.order_delivered_customer_date < s.snapshot_date
 ) f
+LEFT JOIN LATERAL (
+    /* The previous 180-day period is a separate point-in-time window.
+       These features measure whether ordering/revenue is accelerating. */
+    SELECT
+        COUNT(*)::integer AS orders_prior_180d,
+        COALESCE(SUM(d.gross_order_value), 0)::numeric AS revenue_prior_180d
+    FROM ml.delivered_orders d
+    WHERE d.customer_unique_id = s.customer_unique_id
+      AND d.order_purchase_timestamp >= s.snapshot_date - INTERVAL '360 days'
+      AND d.order_purchase_timestamp < s.snapshot_date - INTERVAL '180 days'
+      AND d.order_delivered_customer_date < s.snapshot_date
+) prior ON TRUE
+LEFT JOIN LATERAL (
+    /* All history is still point-in-time: only purchases and deliveries
+       completed before the snapshot are included. LAG derives order gaps. */
+    SELECT
+        COUNT(*)::integer AS lifetime_delivered_orders,
+        (s.snapshot_date - MIN(history.first_purchase_date))::integer
+            AS customer_tenure_days,
+        COUNT(history.gap_days) FILTER (WHERE history.gap_days > 0)::integer
+            AS positive_interpurchase_gap_count,
+        COALESCE(
+            COUNT(*) FILTER (WHERE history.gap_days = 0)::numeric
+            / NULLIF(COUNT(history.gap_days), 0),
+            0
+        ) AS zero_interpurchase_gap_share,
+        AVG(history.gap_days) FILTER (WHERE history.gap_days > 0)::numeric
+            AS avg_interpurchase_days,
+        percentile_cont(0.5) WITHIN GROUP (ORDER BY history.gap_days)
+            FILTER (WHERE history.gap_days > 0)::numeric
+            AS median_interpurchase_days,
+        STDDEV_POP(history.gap_days) FILTER (WHERE history.gap_days > 0)::numeric
+            / NULLIF(
+                AVG(history.gap_days) FILTER (WHERE history.gap_days > 0),
+                0
+            ) AS interpurchase_gap_cv,
+        (s.snapshot_date - MAX(history.purchase_date))::integer AS recency_days
+    FROM (
+        SELECT
+            d.order_purchase_timestamp::date AS purchase_date,
+            FIRST_VALUE(d.order_purchase_timestamp::date) OVER (
+                ORDER BY d.order_purchase_timestamp, d.order_id
+            ) AS first_purchase_date,
+            EXTRACT(
+                EPOCH FROM (
+                    d.order_purchase_timestamp
+                    - LAG(d.order_purchase_timestamp) OVER (
+                        ORDER BY d.order_purchase_timestamp, d.order_id
+                    )
+                )
+            ) / 86400.0 AS gap_days
+        FROM ml.delivered_orders d
+        WHERE d.customer_unique_id = s.customer_unique_id
+          AND d.order_purchase_timestamp < s.snapshot_date
+          AND d.order_delivered_customer_date < s.snapshot_date
+    ) history
+) history ON TRUE
 LEFT JOIN LATERAL (
     /* Average reviews per order first, then weight each order equally.
        Multiple review rows for one order must not dominate this feature. */

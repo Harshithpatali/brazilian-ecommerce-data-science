@@ -34,3 +34,19 @@ def test_review_score_uses_answer_timestamp_and_order_weighting():
     assert "r.review_answer_timestamp < s.snapshot_date" in sql
     assert "r.review_creation_date < s.snapshot_date" not in sql
     assert "AVG(order_review.order_avg_review_score)" in sql
+
+
+
+def test_history_features_are_restricted_to_orders_observable_before_snapshot():
+    sql = SQL_PATH.read_text(encoding="utf-8")
+    assert "d.order_purchase_timestamp < s.snapshot_date" in sql
+    assert "d.order_delivered_customer_date < s.snapshot_date" in sql
+    assert "LAG(d.order_purchase_timestamp)" in sql
+    assert "lifetime_delivered_orders" in sql
+    assert "median_interpurchase_days" in sql
+    assert "positive_interpurchase_gap_count" in sql
+    assert "zero_interpurchase_gap_share" in sql
+    assert "FILTER (WHERE history.gap_days > 0)" in sql
+    assert "orders_prior_180d" in sql
+    assert "s.snapshot_date - INTERVAL '360 days'" in sql
+    assert "s.snapshot_date - INTERVAL '180 days'" in sql

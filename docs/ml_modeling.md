@@ -9,9 +9,9 @@ placed during the 90 days after a monthly point-in-time snapshot.
 
 1. Logistic Regression — interpretable linear baseline with balanced class weights.
 2. HistGradientBoosting — nonlinear boosted-tree model for tabular data.
+3. Random Forest — class-balanced, shallow/regularized bagged-tree candidate.
 
-The current implementation compares these two models. Random Forest is not
-part of the training code.
+The current implementation compares all three candidates.
 
 ## Class imbalance and scoring objective
 
@@ -40,14 +40,14 @@ test periods. A 90-day embargo is applied between each period because the
 target looks 90 days into the future. Snapshots whose outcome windows overlap
 the next period are excluded from the earlier partition.
 
-- Validation selects the repeat-purchase probability threshold by maximum F1.
-  The complementary churn-probability cutoff is stored for risk scoring.
+- Validation selects the repeat-purchase probability threshold by maximum F2 (beta=2), deliberately favoring recall. The complementary churn-probability cutoff is stored for risk scoring.
 - The final test period is evaluated once after the model and threshold are frozen.
 - Test PR-AUC, ROC-AUC and F1 focus on the minority repeat-purchase event and
   are compared with a DummyClassifier prior-probability baseline.
 - Reports also include both classes' precision/recall/F1, balanced accuracy,
   and Matthews correlation coefficient.
-- The F1 threshold is not business-optimal without an intervention cost model.
+- The F2 threshold is not business-optimal without an intervention cost model and false-positive costs.
+- The v4 holdout results were PR-AUC 0.0472 vs. prior baseline 0.0242, recall 65.18%, precision 3.62%, and F2 0.1482. The model flagged 43.6% of holdout rows; use a validation-selected precision floor or a known campaign-capacity constraint before operational use.
 
 ## Outputs
 
