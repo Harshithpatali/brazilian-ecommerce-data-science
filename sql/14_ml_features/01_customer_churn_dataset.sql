@@ -214,6 +214,14 @@ SELECT
     profile.avg_items_per_order_180d,
     profile.avg_categories_per_order_180d,
     profile.avg_sellers_per_order_180d,
+    profile.avg_distinct_products_per_order_180d,
+    profile.avg_product_diversity_share_180d,
+    preferences.category_preference_entropy_180d,
+    preferences.dominant_category_share_180d,
+    preferences.seller_concentration_hhi_180d,
+    preferences.top_seller_share_180d,
+    profile.payment_type_diversity_180d,
+    profile.installment_order_share_180d,
     profile.avg_payment_installments_180d,
     profile.credit_card_order_share_180d,
     profile.avg_freight_share_180d,
@@ -280,6 +288,10 @@ CROSS JOIN LATERAL (
         AVG(ob.item_count)::numeric AS avg_items_per_order_180d,
         AVG(ob.distinct_categories)::numeric AS avg_categories_per_order_180d,
         AVG(ob.seller_count)::numeric AS avg_sellers_per_order_180d,
+        AVG(ob.distinct_products)::numeric AS avg_distinct_products_per_order_180d,
+        AVG(ob.distinct_products::numeric / NULLIF(ob.item_count, 0))::numeric AS avg_product_diversity_share_180d,
+        AVG(ob.payment_type_count)::numeric AS payment_type_diversity_180d,
+        AVG((ob.max_installments > 1)::integer)::numeric AS installment_order_share_180d,
         AVG(ob.max_installments)::numeric AS avg_payment_installments_180d,
         AVG(ob.is_credit_card::numeric) AS credit_card_order_share_180d,
         AVG(ob.freight_share)::numeric AS avg_freight_share_180d
@@ -289,7 +301,60 @@ CROSS JOIN LATERAL (
       AND d.order_purchase_timestamp >= s.snapshot_date - INTERVAL '180 days'
       AND d.order_purchase_timestamp < s.snapshot_date
       AND d.order_delivered_customer_date < s.snapshot_date
-) profile
+ ) profile
+LEFT JOIN LATERAL (
+    /* Category and seller mix are computed only from completed orders
+       observable before the snapshot. Entropy and HHI summarize concentration. */
+    WITH history_items AS (
+        SELECT
+            COALESCE(p.product_category_name, 'unknown') AS category_name,
+            oi.seller_id,
+            COUNT(*)::numeric AS item_count
+        FROM ml.delivered_orders d
+        JOIN public.olist_order_items oi ON oi.order_id = d.order_id
+        LEFT JOIN public.olist_products p ON p.product_id = oi.product_id
+        WHERE d.customer_unique_id = s.customer_unique_id
+          AND d.order_purchase_timestamp >= s.snapshot_date - INTERVAL '180 days'
+          AND d.order_purchase_timestamp < s.snapshot_date
+          AND d.order_delivered_customer_date < s.snapshot_date
+        GROUP BY COALESCE(p.product_category_name, 'unknown'), oi.seller_id
+    ),
+    category_mix AS (
+        SELECT SUM(item_count) AS category_items
+        FROM history_items
+        GROUP BY category_name
+    ),
+    seller_mix AS (
+        SELECT SUM(item_count) AS seller_items
+        FROM history_items
+        WHERE seller_id IS NOT NULL
+        GROUP BY seller_id
+    )
+    SELECT
+        COALESCE((
+            SELECT -SUM((category_items / NULLIF(total_items, 0))
+                        * LN(category_items / NULLIF(total_items, 0)))
+            FROM category_mix
+            CROSS JOIN (SELECT SUM(category_items) AS total_items FROM category_mix) totals
+            WHERE category_items > 0 AND total_items > 0
+        ), 0)::numeric AS category_preference_entropy_180d,
+        COALESCE((
+            SELECT MAX(category_items / NULLIF(total_items, 0))
+            FROM category_mix
+            CROSS JOIN (SELECT SUM(category_items) AS total_items FROM category_mix) totals
+        ), 0)::numeric AS dominant_category_share_180d,
+        COALESCE((
+            SELECT SUM(POWER(seller_items / NULLIF(total_items, 0), 2))
+            FROM seller_mix
+            CROSS JOIN (SELECT SUM(seller_items) AS total_items FROM seller_mix) totals
+            WHERE total_items > 0
+        ), 0)::numeric AS seller_concentration_hhi_180d,
+        COALESCE((
+            SELECT MAX(seller_items / NULLIF(total_items, 0))
+            FROM seller_mix
+            CROSS JOIN (SELECT SUM(seller_items) AS total_items FROM seller_mix) totals
+        ), 0)::numeric AS top_seller_share_180d
+) preferences ON TRUE
 CROSS JOIN LATERAL (
     SELECT
         COUNT(*)::integer AS orders_180d,
