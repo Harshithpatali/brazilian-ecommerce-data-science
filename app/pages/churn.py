@@ -77,6 +77,16 @@ def render() -> None:
         return
 
     contract_errors = validate_model_metadata(metadata)
+    if metadata.get("pipeline_status") == "research_only":
+        gate = metadata.get("promotion_gate", {})
+        st.warning(
+            "Research-only model: the selected candidate did not beat the lifetime-frequency baseline "
+            "on the untouched holdout and every campaign-capacity check. Do not use it for production targeting."
+        )
+        st.caption(
+            f"Holdout PR-AUC: {gate.get('test_pr_auc', float('nan')):.5f}; "
+            f"lifetime-frequency baseline: {gate.get('lifetime_frequency_test_pr_auc', float('nan')):.5f}."
+        )
     if contract_errors:
         st.warning(
             "The churn model artifacts are missing, stale, or inconsistent. "
