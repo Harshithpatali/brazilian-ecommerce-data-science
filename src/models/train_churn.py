@@ -235,7 +235,7 @@ def choose_f1_threshold(
     predicted_repeat = (repeat_probabilities >= repeat_threshold).astype(int)
     # Translate the repeat-purchase threshold to a churn-probability threshold.
     # nextafter preserves the complementary decision at exact ties.
-    churn_threshold = float(np.nextafter(1.0 - repeat_threshold, np.inf))
+    churn_threshold = min(1.0, float(np.nextafter(1.0 - repeat_threshold, np.inf)))
     return churn_threshold, {
         "precision": float(precision_score(repeat_target, predicted_repeat, zero_division=0)),
         "recall": float(recall_score(repeat_target, predicted_repeat, zero_division=0)),
