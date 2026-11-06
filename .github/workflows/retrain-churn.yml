@@ -113,6 +113,7 @@ jobs:
           print(f"Selected model: {metadata['selected_model']}")
           print(f"Final test metrics: {json.dumps(metadata['test_metrics'], sort_keys=True)}")
           print(f"Monthly contact-capacity metrics: {json.dumps(metadata['test_capacity_metrics'], sort_keys=True)}")
+          print(f"Baseline capacity metrics: {json.dumps(metadata['baseline_capacity_metrics'], sort_keys=True)}")
           print(f"Customer-clustered PR-AUC interval: {json.dumps(metadata['customer_cluster_bootstrap_pr_auc_ci95'], sort_keys=True)}")
           print(f"Dataset rows: {metadata['class_distribution']['all']}")
           PY
