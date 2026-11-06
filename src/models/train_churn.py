@@ -22,6 +22,8 @@ from sklearn.model_selection import GridSearchCV, TimeSeriesSplit
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
+from src.features.churn_features import FEATURE_COLS
+from src.models.model_contract import MODEL_VERSION
 from .mlflow_utils import configure_mlflow, get_tracking_uri
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -29,16 +31,6 @@ DATA = ROOT / "data" / "ml" / "customer_churn_dataset.parquet"
 MODEL_DIR = ROOT / "models"
 MODEL_DIR.mkdir(exist_ok=True)
 
-MODEL_VERSION = "churn-pit-v2"
-FEATURE_COLS = [
-    "orders_180d", "orders_90d", "orders_30d",
-    "revenue_180d", "revenue_90d", "revenue_30d",
-    "avg_order_value_180d", "avg_review_score_180d",
-    "avg_delivery_delay_180d", "active_months_180d",
-    "recency_days", "recent_order_share", "recent_revenue_share",
-    "orders_per_active_month", "revenue_per_order",
-    "recent_vs_older_order_ratio",
-]
 
 
 def _dates(values: pd.Series | list[Any]) -> pd.Series:
