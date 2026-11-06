@@ -99,6 +99,16 @@ def validate_model_metadata(metadata: dict[str, Any]) -> list[str]:
     elif availability.get("review_score") != "review_answer_timestamp < snapshot_date":
         errors.append("review_score must use review_answer_timestamp as its availability time.")
     else:
+        if availability.get("first_order_profile") != (
+            "first delivered order purchase and delivery timestamps < snapshot_date; "
+            "review score requires review_answer_timestamp < snapshot_date"
+        ):
+            errors.append("first_order_profile must use only pre-snapshot order and review information.")
+        if availability.get("rolling_order_profile") != (
+            "purchase_timestamp < snapshot_date and delivery_timestamp < snapshot_date "
+            "within the trailing 180-day feature window"
+        ):
+            errors.append("rolling_order_profile must use only delivered pre-snapshot orders.")
         if availability.get("lifetime_history") != (
             "purchase_timestamp < snapshot_date and delivered_timestamp < snapshot_date"
         ):
