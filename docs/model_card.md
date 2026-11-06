@@ -27,6 +27,8 @@ Short-term order activity uses the 180 days before the snapshot, while a
 separate prior 180-day window supplies purchase-frequency and revenue trends.
 Lifetime delivered-order count, customer tenure and interpurchase-gap
 statistics use only orders purchased and delivered before the snapshot.
+Identical purchase timestamps are represented by a zero-gap share; positive
+gap summaries remain missing when no positive interpurchase interval exists.
 Review scores are included only when their review-answer timestamps precede
 the snapshot. Future observations are used only to construct the target.
 
