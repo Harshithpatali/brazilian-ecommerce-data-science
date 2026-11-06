@@ -9,7 +9,7 @@ import streamlit as st
 
 from app.components.ui import hero, metric_card, section_title
 from src.features.churn_features import FEATURE_COLS, add_churn_features
-from src.models.model_contract import MODEL_VERSION, validate_model_metadata
+from src.models.model_contract import validate_model_metadata
 
 ROOT = Path(__file__).resolve().parents[2]
 DATA_PATH = ROOT / "data" / "ml" / "customer_churn_dataset.parquet"
