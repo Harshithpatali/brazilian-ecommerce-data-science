@@ -7,6 +7,7 @@ from src.models.model_contract import MODEL_VERSION, validate_model_metadata
 def valid_metadata():
     return {
         "pipeline_status": "ready",
+        "promotion_gate": {"production_eligible": True},
         "model_version": MODEL_VERSION,
         "feature_columns": FEATURE_COLS,
         "cohort_definition": "Eligible after at least one delivered order; predict the second delivered purchase within the next 90 days.",
@@ -225,3 +226,18 @@ def test_model_contract_requires_known_customer_test_subset():
     metadata = valid_metadata()
     metadata.pop("known_customer_test_metrics")
     assert any("known_customer_test_metrics" in error for error in validate_model_metadata(metadata))
+
+
+
+def test_research_only_status_is_valid_when_promotion_gate_fails():
+    metadata = valid_metadata()
+    metadata["pipeline_status"] = "research_only"
+    metadata["promotion_gate"] = {"production_eligible": False}
+    assert validate_model_metadata(metadata) == []
+
+
+def test_pipeline_status_must_match_promotion_gate():
+    metadata = valid_metadata()
+    metadata["promotion_gate"]["production_eligible"] = False
+    errors = validate_model_metadata(metadata)
+    assert any("must agree with promotion_gate" in error for error in errors)
