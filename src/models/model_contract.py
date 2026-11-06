@@ -148,7 +148,8 @@ def validate_model_metadata(metadata: dict[str, Any]) -> list[str]:
             "class_0_precision", "class_0_recall", "class_0_f1",
             "class_1_precision", "class_1_recall", "class_1_f1",
             "balanced_accuracy", "positive_prevalence", "threshold",
-            "dummy_baseline_pr_auc", "brier_score", "expected_calibration_error",
+            "dummy_baseline_pr_auc", "brier_score", "prior_dummy_brier_score",
+            "expected_calibration_error", "mean_predicted_repeat_probability",
             "recency_baseline_pr_auc", "frequency_baseline_pr_auc",
             "lifetime_frequency_baseline_pr_auc",
         )
@@ -157,10 +158,13 @@ def validate_model_metadata(metadata: dict[str, Any]) -> list[str]:
             if isinstance(value, (int, float)) and isfinite(float(value)):
                 if not 0 <= float(value) <= 1:
                     errors.append(f"test_metrics.{name} must be between 0 and 1.")
-        log_loss_value = metrics.get("log_loss")
-        if isinstance(log_loss_value, (int, float)) and isfinite(float(log_loss_value)):
-            if float(log_loss_value) < 0:
-                errors.append("test_metrics.log_loss cannot be negative.")
+        for name in ("log_loss", "prior_dummy_log_loss"):
+            value = metrics.get(name)
+            if isinstance(value, (int, float)) and isfinite(float(value)) and float(value) < 0:
+                errors.append(f"test_metrics.{name} cannot be negative.")
+        ratio = metrics.get("predicted_to_observed_rate_ratio")
+        if isinstance(ratio, (int, float)) and isfinite(float(ratio)) and float(ratio) < 0:
+            errors.append("test_metrics.predicted_to_observed_rate_ratio cannot be negative.")
         metric_threshold = metrics.get("threshold")
         mcc = metrics.get("matthews_corrcoef")
         if isinstance(mcc, (int, float)) and isfinite(float(mcc)):
@@ -281,6 +285,15 @@ def validate_model_metadata(metadata: dict[str, Any]) -> list[str]:
         replicates = ci.get("valid_replicates")
         if not isinstance(replicates, int) or replicates <= 0:
             errors.append("Customer-clustered PR-AUC interval must have valid bootstrap replicates.")
+
+    known = metadata.get("known_customer_test_metrics")
+    if not isinstance(known, dict):
+        errors.append("known_customer_test_metrics is missing.")
+    else:
+        for name in ("rows", "customers"):
+            value = known.get(name)
+            if not isinstance(value, int) or value < 0:
+                errors.append(f"known_customer_test_metrics.{name} must be a non-negative integer.")
 
     unseen = metadata.get("unseen_customer_test_metrics")
     if not isinstance(unseen, dict):
