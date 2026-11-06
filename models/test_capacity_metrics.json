@@ -4,10 +4,10 @@
     "monthly_cohorts": 4,
     "snapshots_scored": 143208,
     "customers_contacted": 7162,
-    "true_repeat_purchases_captured": 100,
-    "precision": 0.013962580284836637,
-    "recall": 0.11337868480725624,
-    "lift_over_monthly_prevalence": 2.2670671172685775,
+    "true_repeat_purchases_captured": 96,
+    "precision": 0.013404077073443172,
+    "recall": 0.10884353741496598,
+    "lift_over_monthly_prevalence": 2.176384432577834,
     "overall_repeat_purchase_prevalence": 0.006158873805932629
   },
   "10%": {
@@ -15,10 +15,10 @@
     "monthly_cohorts": 4,
     "snapshots_scored": 143208,
     "customers_contacted": 14322,
-    "true_repeat_purchases_captured": 148,
-    "precision": 0.01033375226923614,
-    "recall": 0.16780045351473924,
-    "lift_over_monthly_prevalence": 1.6778639398784232,
+    "true_repeat_purchases_captured": 169,
+    "precision": 0.011800027929060188,
+    "recall": 0.19160997732426305,
+    "lift_over_monthly_prevalence": 1.9159392286449561,
     "overall_repeat_purchase_prevalence": 0.006158873805932629
   },
   "20%": {
@@ -26,10 +26,10 @@
     "monthly_cohorts": 4,
     "snapshots_scored": 143208,
     "customers_contacted": 28643,
-    "true_repeat_purchases_captured": 241,
-    "precision": 0.008413923122577943,
-    "recall": 0.2732426303854875,
-    "lift_over_monthly_prevalence": 1.3661463747597982,
+    "true_repeat_purchases_captured": 264,
+    "precision": 0.00921691163635094,
+    "recall": 0.29931972789115646,
+    "lift_over_monthly_prevalence": 1.4965254893634303,
     "overall_repeat_purchase_prevalence": 0.006158873805932629
   }
 }
