@@ -4,6 +4,16 @@ on:
   push:
     branches:
       - fix/churn-dashboard-and-data-contracts
+    paths:
+      - ".github/workflows/retrain-churn.yml"
+      - "app/**"
+      - "docs/**"
+      - "README.md"
+      - "requirements.txt"
+      - "scripts/**"
+      - "sql/**"
+      - "src/**"
+      - "tests/**"
   workflow_dispatch:
 
 permissions:
