@@ -417,11 +417,13 @@ def main() -> None:
         "feature_columns": FEATURE_COLS,
         "feature_window_days": 180,
         "prediction_window_days": 90,
+        "label_horizon_embargo_days": 90,
         "evaluation_design": (
             "Unique snapshot dates split chronologically into train, validation "
-            "and final test; CV folds grouped by unique date. Customers can appear "
-            "in earlier and later periods because the use case is future scoring "
-            "of known customers."
+            "and final test with a 90-day embargo at period boundaries; CV folds "
+            "are grouped by unique date and purge overlapping 90-day label windows. "
+            "Customers can appear in earlier and later periods because the use "
+            "case is future scoring of known customers."
         ),
         "periods": periods,
         "class_distribution": {
@@ -469,6 +471,8 @@ def main() -> None:
             (metadata_path, "model_selection"),
             (report_path, "evaluation"),
             (matrix_path, "evaluation"),
+            (MODEL_DIR / "test_precision_recall_curve.csv", "evaluation"),
+            (MODEL_DIR / "test_predictions.parquet", "evaluation"),
         ]:
             mlflow.log_artifact(str(artifact), artifact_path=folder)
         mlflow.sklearn.log_model(
