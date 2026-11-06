@@ -30,6 +30,7 @@ from sklearn.metrics import (
     precision_score,
     recall_score,
     roc_auc_score,
+    roc_curve,
 )
 from sklearn.model_selection import GridSearchCV
 from sklearn.pipeline import Pipeline
@@ -51,6 +52,7 @@ MODEL_DIR.mkdir(exist_ok=True)
 
 CAPACITY_FRACTION = 0.10
 BOOTSTRAP_REPLICATES = 500
+CAPACITY_BOOTSTRAP_REPLICATES = 200
 
 
 def _dates(values: pd.Series | list[Any]) -> pd.Series:
@@ -348,6 +350,109 @@ def _calibration_table(y_true: np.ndarray, probabilities: np.ndarray) -> pd.Data
     )
 
 
+def customer_bootstrap_capacity_ci(
+    y_repeat: np.ndarray,
+    scores: np.ndarray,
+    snapshot_dates: pd.Series | np.ndarray,
+    customer_ids: np.ndarray,
+    capacity_fraction: float = CAPACITY_FRACTION,
+    n_bootstrap: int = CAPACITY_BOOTSTRAP_REPLICATES,
+    random_state: int = 73,
+) -> dict[str, dict[str, float]]:
+    """Cluster-bootstrap monthly top-capacity precision, recall and lift."""
+    y = np.asarray(y_repeat, dtype=int)
+    p = np.asarray(scores, dtype=float)
+    dates = pd.to_datetime(pd.Series(snapshot_dates), errors="coerce").dt.normalize().to_numpy()
+    ids = np.asarray(customer_ids).astype(str)
+    if not (len(y) == len(p) == len(dates) == len(ids)):
+        raise ValueError("Labels, scores, dates and customer IDs must have equal lengths.")
+    if np.isnan(p).any() or pd.isna(dates).any():
+        raise ValueError("Scores and dates must be non-missing.")
+    if not 0 < capacity_fraction < 1:
+        raise ValueError("capacity_fraction must be between 0 and 1.")
+
+    unique_ids, inverse = np.unique(ids, return_inverse=True)
+    if len(unique_ids) < 2:
+        raise ValueError("At least two unique customers are required for cluster bootstrap.")
+
+    rng = np.random.default_rng(random_state)
+    values: dict[str, list[float]] = {
+        "precision": [],
+        "recall": [],
+        "lift": [],
+        "flagged_fraction": [],
+    }
+    unique_dates = np.unique(dates)
+
+    for _ in range(n_bootstrap):
+        sampled = rng.integers(0, len(unique_ids), size=len(unique_ids))
+        multiplicity = np.bincount(sampled, minlength=len(unique_ids))
+        row_weights = multiplicity[inverse].astype(int)
+        total_weight = int(row_weights.sum())
+        total_positive = int(np.dot(row_weights, y))
+        if total_weight == 0 or total_positive == 0:
+            continue
+
+        true_positive = 0
+        flagged = 0
+        for date_value in unique_dates:
+            indices = np.flatnonzero(dates == date_value)
+            month_weights = row_weights[indices]
+            month_total = int(month_weights.sum())
+            if month_total == 0:
+                continue
+            n_selected = max(1, int(np.ceil(month_total * capacity_fraction)))
+            # Randomize ties before stable descending score sort.
+            order = indices[rng.permutation(len(indices))]
+            order = order[np.argsort(-p[order], kind="mergesort")]
+            remaining = n_selected
+            for row_index in order:
+                take = min(int(row_weights[row_index]), remaining)
+                if take > 0:
+                    true_positive += take * int(y[row_index])
+                    flagged += take
+                    remaining -= take
+                if remaining == 0:
+                    break
+
+        if flagged == 0:
+            continue
+        precision_value = true_positive / flagged
+        recall_value = true_positive / total_positive
+        prevalence = total_positive / total_weight
+        values["precision"].append(float(precision_value))
+        values["recall"].append(float(recall_value))
+        values["lift"].append(float(precision_value / prevalence) if prevalence > 0 else 0.0)
+        values["flagged_fraction"].append(float(flagged / total_weight))
+
+    result: dict[str, dict[str, float]] = {}
+    for name, samples in values.items():
+        if len(samples) < max(50, int(n_bootstrap * 0.5)):
+            raise ValueError(f"Too few valid customer-bootstrap samples for {name}.")
+        lower, upper = np.quantile(samples, [0.025, 0.975])
+        result[name] = {
+            "lower_95": float(lower),
+            "upper_95": float(upper),
+            "replicates": int(len(samples)),
+        }
+    return result
+
+
+def _expected_calibration_error(
+    y_true: np.ndarray,
+    probabilities: np.ndarray,
+) -> float:
+    table = _calibration_table(y_true, probabilities)
+    if table.empty:
+        return 0.0
+    weights = table["customers"].to_numpy(dtype=float)
+    errors = np.abs(
+        table["mean_predicted_probability"].to_numpy(dtype=float)
+        - table["observed_repeat_rate"].to_numpy(dtype=float)
+    )
+    return float(np.average(errors, weights=weights))
+
+
 def build_models() -> dict[str, tuple[Pipeline, dict[str, list[Any]]]]:
     numeric = Pipeline([
         ("imputer", SimpleImputer(strategy="median", add_indicator=True, keep_empty_features=True)),
@@ -576,6 +681,12 @@ def main() -> None:
     test_ap = float(average_precision_score(y_test_repeat, test_repeat_prob))
     test_roc_auc = float(roc_auc_score(y_test_repeat, test_repeat_prob))
     test_prevalence = float(y_test_repeat.mean())
+    fpr, tpr, _ = roc_curve(y_test_repeat, test_repeat_prob)
+    ks_statistic = float(np.max(tpr - fpr))
+    calibration_table = _calibration_table(y_test_repeat, test_repeat_prob)
+    expected_calibration_error = _expected_calibration_error(
+        y_test_repeat, test_repeat_prob
+    )
     train_prevalence = float((1 - y_train.to_numpy(dtype=int)).mean())
     dummy_prob = np.full(len(y_test_repeat), train_prevalence, dtype=float)
     dummy_ap = float(average_precision_score(y_test_repeat, dummy_prob))
@@ -586,6 +697,8 @@ def main() -> None:
 
     test_metrics: dict[str, float] = {
         "roc_auc": test_roc_auc,
+        "gini": float(2.0 * test_roc_auc - 1.0),
+        "ks_statistic": ks_statistic,
         "pr_auc": test_ap,
         "precision": float(precision_score(y_test_repeat, predicted_repeat, zero_division=0)),
         "recall": float(recall_score(y_test_repeat, predicted_repeat, zero_division=0)),
@@ -606,6 +719,7 @@ def main() -> None:
         "pr_auc_lift_over_recency": float(test_ap / recency_ap) if recency_ap > 0 else 0.0,
         "brier_score": model_brier,
         "log_loss": float(log_loss(y_test_repeat, test_repeat_prob, labels=[0, 1])),
+        "expected_calibration_error": expected_calibration_error,
         "brier_skill_score": float(1.0 - model_brier / dummy_brier) if dummy_brier > 0 else 0.0,
     }
     for fraction_key, summary in capacity_metrics.items():
@@ -614,10 +728,18 @@ def main() -> None:
         test_metrics[f"lift_at_{fraction_key}"] = summary["lift"]
         test_metrics[f"flagged_fraction_at_{fraction_key}"] = summary["flagged_fraction"]
 
+    test_customer_ids = df.iloc[test_idx]["customer_unique_id"].to_numpy()
     bootstrap_ci = customer_bootstrap_pr_auc_ci(
         y_test_repeat,
         test_repeat_prob,
-        df.iloc[test_idx]["customer_unique_id"].to_numpy(),
+        test_customer_ids,
+    )
+    capacity_bootstrap_ci = customer_bootstrap_capacity_ci(
+        y_test_repeat,
+        test_repeat_prob,
+        test_dates,
+        test_customer_ids,
+        capacity_fraction=CAPACITY_FRACTION,
     )
 
     predictions = pd.DataFrame({
@@ -639,7 +761,7 @@ def main() -> None:
         "recall": recall[:-1],
         "repeat_purchase_probability_threshold": pr_thresholds,
     }).to_csv(MODEL_DIR / "test_precision_recall_curve.csv", index=False)
-    _calibration_table(y_test_repeat, test_repeat_prob).to_csv(
+    calibration_table.to_csv(
         MODEL_DIR / "test_calibration.csv", index=False
     )
 
@@ -749,6 +871,7 @@ def main() -> None:
         },
         "test_metrics": test_metrics,
         "customer_bootstrap_pr_auc_95_ci": bootstrap_ci,
+        "customer_bootstrap_top10_95_ci": capacity_bootstrap_ci,
         "dummy_baseline": {
             "strategy": "training_prevalence",
             "train_positive_prevalence": train_prevalence,
@@ -810,6 +933,7 @@ def main() -> None:
     print("Operational policy: top 10% by repeat-purchase score in each monthly snapshot")
     print("Final untouched test metrics:", json.dumps(test_metrics, indent=2))
     print("Customer-bootstrap PR-AUC 95% CI:", json.dumps(bootstrap_ci))
+    print("Customer-bootstrap top-10% capacity 95% CIs:", json.dumps(capacity_bootstrap_ci))
 
 
 if __name__ == "__main__":
