@@ -877,6 +877,14 @@ def main() -> None:
                 "order_delivered_customer_date < snapshot_date"
             ),
             "review_score": "review_answer_timestamp < snapshot_date",
+            "first_order_profile": (
+                "first delivered order purchase and delivery timestamps < snapshot_date; "
+                "review score requires review_answer_timestamp < snapshot_date"
+            ),
+            "rolling_order_profile": (
+                "purchase_timestamp < snapshot_date and delivery_timestamp < snapshot_date "
+                "within the trailing 180-day feature window"
+            ),
             "lifetime_history": (
                 "purchase_timestamp < snapshot_date and delivered_timestamp < snapshot_date"
             ),
