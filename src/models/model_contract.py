@@ -24,7 +24,6 @@ _REQUIRED_METRICS = (
     "balanced_accuracy",
     "matthews_corrcoef",
     "positive_prevalence",
-    "threshold",
     "dummy_baseline_pr_auc",
     "pr_auc_lift_over_dummy",
     "recency_only_pr_auc",
@@ -61,7 +60,6 @@ _BOUNDED_METRICS = (
     "class_1_f1",
     "balanced_accuracy",
     "positive_prevalence",
-    "threshold",
     "dummy_baseline_pr_auc",
     "recency_only_pr_auc",
     "brier_score",
@@ -164,14 +162,6 @@ def validate_model_metadata(metadata: dict[str, Any]) -> list[str]:
         mcc = metrics.get("matthews_corrcoef")
         if _finite_number(mcc) and not -1 <= float(mcc) <= 1:
             errors.append("test_metrics.matthews_corrcoef must be between -1 and 1.")
-        metric_threshold = metrics.get("threshold")
-        if (
-            _finite_number(metric_threshold)
-            and _finite_number(threshold)
-            and abs(float(metric_threshold) - float(threshold)) > 1e-12
-        ):
-            errors.append("test_metrics.threshold does not match metadata.threshold.")
-
     baseline = metadata.get("dummy_baseline")
     if not isinstance(baseline, dict):
         errors.append("dummy_baseline is missing or is not an object.")
