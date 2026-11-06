@@ -223,7 +223,7 @@ LEFT JOIN LATERAL (
        completed before the snapshot are included. LAG derives order gaps. */
     SELECT
         COUNT(*)::integer AS lifetime_delivered_orders,
-        MAX(history.first_customer_state) AS customer_state,
+        MAX(history.latest_customer_state) AS customer_state,
         (s.snapshot_date - MIN(history.first_purchase_date))::integer
             AS customer_tenure_days,
         COUNT(history.gap_days) FILTER (WHERE history.gap_days > 0)::integer
@@ -251,8 +251,8 @@ LEFT JOIN LATERAL (
                 ORDER BY d.order_purchase_timestamp, d.order_id
             ) AS first_purchase_date,
             FIRST_VALUE(d.customer_state) OVER (
-                ORDER BY d.order_purchase_timestamp, d.order_id
-            ) AS first_customer_state,
+                ORDER BY d.order_purchase_timestamp DESC, d.order_id DESC
+            ) AS latest_customer_state,
             EXTRACT(
                 EPOCH FROM (
                     d.order_purchase_timestamp
