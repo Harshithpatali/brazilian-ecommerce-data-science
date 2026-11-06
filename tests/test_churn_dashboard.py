@@ -28,3 +28,11 @@ def test_dashboard_uses_shared_metadata_contract_not_training_module():
     source = DASHBOARD.read_text(encoding="utf-8")
     assert "validate_model_metadata" in source
     assert "from src.models.train_churn import" not in source
+
+
+
+def test_dashboard_uses_explicit_repeat_purchase_curve_threshold():
+    source = DASHBOARD.read_text(encoding="utf-8")
+    assert "repeat_purchase_probability_threshold" in source
+    assert "cv_repeat_purchase_pr_auc" in source
+    assert '"class_1_precision"' in source
