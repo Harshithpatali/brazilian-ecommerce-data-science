@@ -20,6 +20,21 @@ METADATA_PATH = ROOT / "models" / "model_metadata.json"
 COMPARISON_PATH = ROOT / "models" / "model_comparison.csv"
 
 
+def _predict_churn_probability(model, features: pd.DataFrame):
+    """Return P(SQL churned=1), independent of estimator class-column order."""
+    classes = getattr(model, "classes_", None)
+    if classes is None:
+        raise ValueError("Model artifact does not expose classes_; cannot verify probability order.")
+    class_values = list(classes)
+    if len(class_values) != 2 or set(class_values) != {0, 1}:
+        raise ValueError(f"Expected binary churn classes [0, 1]; found {class_values!r}.")
+    probabilities = model.predict_proba(features)
+    if probabilities.ndim != 2 or probabilities.shape[1] != 2:
+        raise ValueError("Model predict_proba must return exactly two class probabilities.")
+    churn_index = class_values.index(1)
+    return probabilities[:, churn_index]
+
+
 @st.cache_data
 def load_features() -> pd.DataFrame:
     if not DATA_PATH.exists():
@@ -109,7 +124,7 @@ def render() -> None:
         st.error(f"Scoring dataset is missing features: {missing}")
         return
     try:
-        latest["churn_probability"] = model.predict_proba(features[FEATURE_COLS])[:, 1]
+        latest["churn_probability"] = _predict_churn_probability(model, features[FEATURE_COLS])
     except (ValueError, AttributeError, KeyError) as exc:
         st.error(f"Could not score the latest historical snapshot: {exc}")
         return
