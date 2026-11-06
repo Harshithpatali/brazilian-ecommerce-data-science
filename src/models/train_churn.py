@@ -600,7 +600,6 @@ def main() -> None:
         "balanced_accuracy": float(balanced_accuracy_score(y_test, test_pred)),
         "matthews_corrcoef": float(matthews_corrcoef(y_test_repeat, predicted_repeat)),
         "positive_prevalence": test_prevalence,
-        "threshold": churn_threshold,
         "dummy_baseline_pr_auc": dummy_ap,
         "pr_auc_lift_over_dummy": float(test_ap - dummy_ap),
         "recency_only_pr_auc": recency_ap,
