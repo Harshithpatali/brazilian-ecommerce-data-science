@@ -1,11 +1,14 @@
 /*
-POINT-IN-TIME CUSTOMER CHURN DATASET
+POINT-IN-TIME CUSTOMER REPEAT-PURCHASE PROPENSITY DATASET (v5)
 
+Population: every customer after their first delivered order, while they have
+at least one delivered order in the previous 180 days.
 Target interval: [snapshot_date, snapshot_date + 90 days)
-Features use only orders purchased before the snapshot and delivered to the
-customer before the snapshot. Review scores are available only after
-review_answer_timestamp. The source observation end uses all source orders.
-Every eligible monthly snapshot is retained: 90-day churn is not permanent.
+Features use only purchases and deliveries completed before the snapshot.
+Review scores are available only after review_answer_timestamp. Customer
+state is taken from the earliest delivered order observable at the snapshot.
+The source observation end uses all source orders. A customer can appear in
+multiple monthly snapshots; each row is a separate monthly decision moment.
 */
 
 DROP TABLE IF EXISTS ml.delivered_orders CASCADE;
@@ -16,17 +19,20 @@ DROP TABLE IF EXISTS ml.review_events CASCADE;
 
 CREATE TABLE ml.delivered_orders AS
 SELECT
-    customer_unique_id,
-    order_id,
-    order_purchase_timestamp,
-    order_delivered_customer_date,
-    COALESCE(gross_order_value, 0)::numeric AS gross_order_value,
-    delivery_delay_days
-FROM analytics.order_level
-WHERE order_status = 'delivered'
-  AND customer_unique_id IS NOT NULL
-  AND order_purchase_timestamp IS NOT NULL
-  AND order_delivered_customer_date IS NOT NULL;
+    o.customer_unique_id,
+    o.order_id,
+    o.order_purchase_timestamp,
+    o.order_delivered_customer_date,
+    COALESCE(o.gross_order_value, 0)::numeric AS gross_order_value,
+    o.delivery_delay_days,
+    COALESCE(c.customer_state, 'UNKNOWN') AS customer_state
+FROM analytics.order_level o
+LEFT JOIN public.olist_customers c
+    ON c.customer_id = o.customer_id
+WHERE o.order_status = 'delivered'
+  AND o.customer_unique_id IS NOT NULL
+  AND o.order_purchase_timestamp IS NOT NULL
+  AND o.order_delivered_customer_date IS NOT NULL;
 
 CREATE INDEX idx_ml_delivered_customer_purchase
     ON ml.delivered_orders (customer_unique_id, order_purchase_timestamp);
@@ -62,7 +68,8 @@ CREATE INDEX idx_ml_customer_month
     ON ml.customer_monthly_activity (customer_unique_id, activity_month);
 ANALYZE ml.customer_monthly_activity;
 
-/* Begin after the second delivered order. Only dates with a fully observed
+/* Begin after the first delivered order. This includes first-time buyers,
+   not only customers who have already repeated. Only dates with a complete
    90-day future label window are materialized. */
 CREATE TABLE ml.customer_snapshot_calendar AS
 WITH ranked_delivered AS (
@@ -76,12 +83,12 @@ WITH ranked_delivered AS (
         ) AS delivered_order_number
     FROM ml.delivered_orders
 ),
-second_delivered AS (
+first_delivered AS (
     SELECT
         customer_unique_id,
-        order_delivered_customer_date AS second_delivery_timestamp
+        order_delivered_customer_date AS first_delivery_timestamp
     FROM ranked_delivered
-    WHERE delivered_order_number = 2
+    WHERE delivered_order_number = 1
 ),
 observation_end AS (
     SELECT MAX(order_purchase_timestamp) AS max_observed_purchase_timestamp
@@ -91,11 +98,11 @@ observation_end AS (
 SELECT
     s.customer_unique_id,
     generated.snapshot_timestamp::date AS snapshot_date
-FROM second_delivered s
+FROM first_delivered s
 CROSS JOIN observation_end o
 CROSS JOIN LATERAL GENERATE_SERIES(
     (
-        DATE_TRUNC('month', s.second_delivery_timestamp)::date
+        DATE_TRUNC('month', s.first_delivery_timestamp)::date
         + INTERVAL '1 month'
     )::timestamp,
     DATE_TRUNC('month', o.max_observed_purchase_timestamp)::timestamp,
@@ -116,6 +123,8 @@ CREATE TABLE ml.customer_churn_dataset AS
 SELECT
     s.customer_unique_id,
     s.snapshot_date,
+    EXTRACT(MONTH FROM s.snapshot_date)::integer AS snapshot_month,
+    history.customer_state,
     f.orders_180d,
     f.orders_90d,
     f.orders_30d,
@@ -214,6 +223,7 @@ LEFT JOIN LATERAL (
        completed before the snapshot are included. LAG derives order gaps. */
     SELECT
         COUNT(*)::integer AS lifetime_delivered_orders,
+        MAX(history.first_customer_state) AS customer_state,
         (s.snapshot_date - MIN(history.first_purchase_date))::integer
             AS customer_tenure_days,
         COUNT(history.gap_days) FILTER (WHERE history.gap_days > 0)::integer
@@ -240,6 +250,9 @@ LEFT JOIN LATERAL (
             FIRST_VALUE(d.order_purchase_timestamp::date) OVER (
                 ORDER BY d.order_purchase_timestamp, d.order_id
             ) AS first_purchase_date,
+            FIRST_VALUE(d.customer_state) OVER (
+                ORDER BY d.order_purchase_timestamp, d.order_id
+            ) AS first_customer_state,
             EXTRACT(
                 EPOCH FROM (
                     d.order_purchase_timestamp
