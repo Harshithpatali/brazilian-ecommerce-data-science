@@ -50,7 +50,7 @@ MODEL_DIR = ROOT / "models"
 MODEL_DIR.mkdir(exist_ok=True)
 
 CAPACITY_FRACTION = 0.10
-BOOTSTRAP_REPLICATES = 100
+BOOTSTRAP_REPLICATES = 500
 
 
 def _dates(values: pd.Series | list[Any]) -> pd.Series:
@@ -710,7 +710,7 @@ def main() -> None:
                 "order_delivered_customer_date < snapshot_date"
             ),
             "review_score": "review_answer_timestamp < snapshot_date",
-            "customer_state": "state from earliest delivered order observable before snapshot_date",
+            "customer_state": "state from most recent delivered order observable before snapshot_date",
             "snapshot_month": "calendar month of snapshot_date",
             "lifetime_history": (
                 "purchase_timestamp < snapshot_date and delivered_timestamp < snapshot_date"
