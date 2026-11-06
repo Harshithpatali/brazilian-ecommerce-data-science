@@ -228,6 +228,33 @@ def validate_model_metadata(metadata: dict[str, Any]) -> list[str]:
                         f"test_capacity_metrics.{capacity}.{metric_name} must be between 0 and 1."
                     )
 
+    baseline_capacity = metadata.get("baseline_capacity_metrics")
+    if not isinstance(baseline_capacity, dict):
+        errors.append("baseline_capacity_metrics is missing or is not an object.")
+    else:
+        for baseline_name in ("recency_only", "orders_180d_only", "lifetime_frequency_only"):
+            baseline_values = baseline_capacity.get(baseline_name)
+            if not isinstance(baseline_values, dict):
+                errors.append(f"baseline_capacity_metrics.{baseline_name} is missing.")
+                continue
+            for capacity in ("5%", "10%", "20%"):
+                values = baseline_values.get(capacity)
+                if not isinstance(values, dict):
+                    errors.append(
+                        f"baseline_capacity_metrics.{baseline_name}.{capacity} is missing."
+                    )
+                    continue
+                for metric_name in ("precision", "recall", "lift_over_monthly_prevalence"):
+                    value = values.get(metric_name)
+                    if not isinstance(value, (int, float)) or not isfinite(float(value)):
+                        errors.append(
+                            f"baseline_capacity_metrics.{baseline_name}.{capacity}.{metric_name} must be finite."
+                        )
+                    elif metric_name != "lift_over_monthly_prevalence" and not 0 <= float(value) <= 1:
+                        errors.append(
+                            f"baseline_capacity_metrics.{baseline_name}.{capacity}.{metric_name} must be between 0 and 1."
+                        )
+
     ci = metadata.get("customer_cluster_bootstrap_pr_auc_ci95")
     if not isinstance(ci, dict):
         errors.append("customer_cluster_bootstrap_pr_auc_ci95 is missing.")
