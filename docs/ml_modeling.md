@@ -15,7 +15,19 @@ part of the training code.
 
 ## Training and selection
 
-- Unique snapshot dates remain intact when constructing temporal folds.
+The SQL target is majority class 1 (no delivered purchase in the next 90 days)
+in the rebuilt sample. The full rebuilt dataset contains 306 repeat-purchase
+snapshots out of 10,570 (2.89%). To avoid optimizing for an almost-constant
+majority prediction, the CV scorer computes average precision for the minority
+repeat-purchase event (`1 - churned`). The fitted estimators retain the SQL
+`churned` label, and repeat-purchase probability is computed as
+`1 - P(churned)`.
+
+
+
+- Unique snapshot dates remain intact when constructing temporal folds. The
+chronological allocation reserves a longer training history and separate
+validation and final-test windows; 90-day purging is retained.
 - Expanding-window cross-validation is run on the training period with a 90-day
   purge between each fold's training and validation dates.
 - GridSearchCV optimizes average precision for repeat purchase within 90 days
