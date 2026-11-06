@@ -119,6 +119,11 @@ def render() -> None:
         "Historical Olist demonstration: these are backfilled predictions for the "
         "latest available monthly snapshot, not a live marketplace feed."
     )
+    st.caption(
+        f"Validation-calibrated repeat-purchase reference threshold: "
+        f"{float(metadata['repeat_purchase_probability_threshold']):.2%}. "
+        "Operational prioritization uses within-month ranking and campaign capacity."
+    )
 
     default_capacity = int(round(float(metadata.get("capacity_fraction", 0.10)) * 100))
     capacity_options = [5, 10, 20]
