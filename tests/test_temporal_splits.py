@@ -22,8 +22,8 @@ def test_partitions_are_chronological_and_keep_dates_together():
     validation_dates = pd.to_datetime(dates.iloc[validation]).dt.normalize()
     test_dates = pd.to_datetime(dates.iloc[test]).dt.normalize()
 
-    assert train_dates.max() < validation_dates.min()
-    assert validation_dates.max() < test_dates.min()
+    assert train_dates.max() + pd.Timedelta(days=90) <= validation_dates.min()
+    assert validation_dates.max() + pd.Timedelta(days=90) <= test_dates.min()
     assert periods["train_start"] < periods["validation_start"] < periods["test_start"]
 
     membership = {}
@@ -41,7 +41,7 @@ def test_cross_validation_splits_unique_dates_not_rows():
         train_dates = pd.to_datetime(dates.iloc[train]).dt.normalize().unique()
         validation_dates = pd.to_datetime(dates.iloc[validation]).dt.normalize().unique()
         assert len(np.intersect1d(train_dates, validation_dates)) == 0
-        assert train_dates.max() < validation_dates.min()
+        assert train_dates.max() + pd.Timedelta(days=90) <= validation_dates.min()
 
 
 def test_multiple_rows_from_one_snapshot_date_are_never_split():
