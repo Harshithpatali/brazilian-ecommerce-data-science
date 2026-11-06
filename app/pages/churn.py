@@ -339,8 +339,12 @@ def render() -> None:
     prospects = latest.nlargest(target_count, "repeat_purchase_probability").copy()
     display_cols = [
         "customer_unique_id", "repeat_purchase_probability",
-        "lifetime_delivered_orders", "orders_180d", "revenue_180d",
-        "recency_days", "avg_review_score_180d", "avg_delivery_delay_180d",
+        "lifetime_delivered_orders", "first_order_gross_value",
+        "first_order_item_count", "first_order_max_installments",
+        "first_order_freight_share", "orders_180d", "revenue_180d",
+        "avg_items_per_order_180d", "credit_card_order_share_180d",
+        "recency_days", "avg_review_score_180d", "first_order_review_score",
+        "avg_delivery_delay_180d",
     ]
     shown = prospects[
         [column for column in display_cols if column in prospects.columns]
