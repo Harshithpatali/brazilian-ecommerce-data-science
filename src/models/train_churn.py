@@ -336,9 +336,16 @@ def _calibration_table(y_true: np.ndarray, probabilities: np.ndarray) -> pd.Data
         "actual_repeat_purchase": np.asarray(y_true, dtype=int),
         "predicted_probability": np.asarray(probabilities, dtype=float),
     })
-    frame["probability_decile"] = pd.qcut(
-        frame["predicted_probability"], q=10, labels=False, duplicates="drop"
-    )
+    unique_probabilities = int(frame["predicted_probability"].nunique(dropna=True))
+    if unique_probabilities < 2:
+        frame["probability_decile"] = 0
+    else:
+        frame["probability_decile"] = pd.qcut(
+            frame["predicted_probability"],
+            q=min(10, unique_probabilities),
+            labels=False,
+            duplicates="drop",
+        )
     return (
         frame.groupby("probability_decile", dropna=True)
         .agg(
@@ -667,7 +674,10 @@ def main() -> None:
     calibrated_validation = calibrator.predict_proba(_logit(validation_raw_repeat))[:, 1]
 
     repeat_threshold = float(np.quantile(calibrated_validation, 1.0 - CAPACITY_FRACTION))
-    churn_threshold = float(np.nextafter(1.0 - repeat_threshold, np.inf))
+    churn_threshold = min(
+        1.0,
+        float(np.nextafter(1.0 - repeat_threshold, np.inf)),
+    )
     validation_capacity, _ = assign_monthly_capacity(
         y_validation_repeat,
         calibrated_validation,
