@@ -10,6 +10,33 @@ if str(ROOT) not in sys.path:
 from src.database.io import query_to_dataframe
 
 
+MIN_DATASET_ROWS = 300_000
+MIN_DATASET_CUSTOMERS = 70_000
+MIN_REPEAT_PURCHASE_ROWS = 2_000
+
+
+def assert_minimum_dataset_population(summary: dict[str, object]) -> None:
+    """Reject truncated or stale second/third-purchase cohorts."""
+    requirements = {
+        "rows": MIN_DATASET_ROWS,
+        "customers": MIN_DATASET_CUSTOMERS,
+        "repeat_purchase_rows": MIN_REPEAT_PURCHASE_ROWS,
+    }
+    violations = {}
+    for name, minimum in requirements.items():
+        try:
+            value = int(summary[name])
+        except (KeyError, TypeError, ValueError) as exc:
+            raise SystemExit(f"Dataset summary is missing a valid {name!r} count.") from exc
+        if value < minimum:
+            violations[name] = {"actual": value, "minimum": minimum}
+    if violations:
+        raise SystemExit(
+            "Dataset population is below the full Olist v5 contract. "
+            f"Possible stale database, truncated extract or wrong cohort: {violations}"
+        )
+
+
 EXPECTED_ZERO_CHECKS = (
     "duplicate_keys",
     "target_mismatches",
@@ -50,11 +77,17 @@ def main() -> None:
                MAX(snapshot_date) AS last_snapshot,
                AVG(churned::numeric) AS churn_rate,
                SUM((churned = 1)::int) AS churned_rows,
-               SUM((churned = 0)::int) AS non_churned_rows
+               SUM((churned = 0)::int) AS repeat_purchase_rows
         FROM ml.customer_churn_dataset
     """)
     print("Dataset summary")
     print(summary.to_string(index=False))
+    population = summary.iloc[0].to_dict()
+    assert_minimum_dataset_population({
+        "rows": population["rows"],
+        "customers": population["customers"],
+        "repeat_purchase_rows": population["repeat_purchase_rows"],
+    })
 
     distribution = query_to_dataframe("""
         SELECT churned, COUNT(*) AS rows,
