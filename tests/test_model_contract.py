@@ -131,3 +131,12 @@ def test_repeat_purchase_threshold_is_required_and_bounded():
     metadata = valid_metadata()
     metadata["repeat_purchase_probability_threshold"] = 1.5
     assert any("repeat_purchase_probability_threshold" in error for error in validate_model_metadata(metadata))
+
+
+
+def test_churn_and_repeat_probability_thresholds_must_be_complements():
+    metadata = valid_metadata()
+    metadata["threshold"] = 0.90
+    metadata["test_metrics"]["threshold"] = 0.90
+    errors = validate_model_metadata(metadata)
+    assert any("must be complementary" in error for error in errors)
