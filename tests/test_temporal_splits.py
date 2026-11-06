@@ -50,3 +50,17 @@ def test_multiple_rows_from_one_snapshot_date_are_never_split():
         train_dates = set(pd.to_datetime(dates.iloc[train]).dt.normalize())
         validation_dates = set(pd.to_datetime(dates.iloc[validation]).dt.normalize())
         assert train_dates.isdisjoint(validation_dates)
+
+
+
+def test_class_aware_cv_folds_have_both_classes_in_train_and_validation():
+    dates = sample_dates()
+    # Repeat customers/snapshots across dates; both labels appear throughout.
+    labels = []
+    for month_index in range(20):
+        labels.extend([month_index % 2, (month_index + 1) % 2, 1])
+    folds = make_date_grouped_splits(dates, y=pd.Series(labels), n_splits=4)
+
+    for train, validation in folds:
+        assert set(pd.Series(labels).iloc[train].unique()) == {0, 1}
+        assert set(pd.Series(labels).iloc[validation].unique()) == {0, 1}
