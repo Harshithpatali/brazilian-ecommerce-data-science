@@ -18,6 +18,7 @@ EXPECTED_ZERO_CHECKS = (
     "review_feature_mismatches",
     "invalid_history_feature_rows",
     "invalid_categorical_feature_rows",
+    "customer_state_mismatches",
 )
 
 
@@ -141,6 +142,19 @@ def main() -> None:
                  OR snapshot_month <> EXTRACT(MONTH FROM snapshot_date)::integer
                  OR lifetime_delivered_orders < 1
            ) FROM ml.customer_churn_dataset) AS invalid_categorical_feature_rows,
+          (SELECT COUNT(*)
+           FROM ml.customer_churn_dataset dataset
+           CROSS JOIN LATERAL (
+               SELECT d.customer_state
+               FROM ml.delivered_orders d
+               WHERE d.customer_unique_id = dataset.customer_unique_id
+                 AND d.order_purchase_timestamp < dataset.snapshot_date
+                 AND d.order_delivered_customer_date < dataset.snapshot_date
+               ORDER BY d.order_purchase_timestamp DESC, d.order_id DESC
+               LIMIT 1
+           ) expected
+           WHERE dataset.customer_state IS DISTINCT FROM expected.customer_state
+          ) AS customer_state_mismatches,
           (SELECT COUNT(*)
            FROM ml.customer_churn_dataset dataset
            CROSS JOIN source_end
