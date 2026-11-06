@@ -254,6 +254,18 @@ Every script is designed to be **rerunnable against a live database** without ma
 - **Leakage control:** historical orders must be purchased and delivered before the snapshot; review scores are included only when `review_answer_timestamp` is before the snapshot, and multiple review rows are averaged within each order before customer-level aggregation. Future orders are used only to create the target. Snapshots without a complete 90-day future window are excluded.
 - **Features:** 30/90/180-day rolling order counts and revenue, average order value, average review score, average delivery delay, active months, recency, recent order/revenue share, orders per active month, revenue per order, and recent-vs-older order ratio.
 
+### Class imbalance and evaluation target
+
+The rebuilt point-in-time dataset contains **10,570 customer-month snapshots**
+across 2,374 customers. Only **306 snapshots (2.89%)** have a delivered
+purchase in the following 90 days; 10,264 (97.11%) do not. These are full
+dataset counts, not holdout metrics. Because no-purchase is the majority
+class, model selection and PR-AUC focus on the minority event—purchase within
+90 days (`churned = 0`). The model still predicts churn probability; repeat-
+purchase probability is its complement. The validation F1 threshold for
+repeat purchase is converted to a complementary churn-risk cutoff for the
+dashboard.
+
 ### Model comparison
 
 Two model families are tuned with **expanding-window temporal cross-validation grouped by unique snapshot dates**, a 90-day embargo between fold periods, and GridSearchCV. Model selection optimizes average precision (PR-AUC) for the minority event: a delivered purchase within 90 days (`churned = 0`), not the 97% majority no-purchase class.
