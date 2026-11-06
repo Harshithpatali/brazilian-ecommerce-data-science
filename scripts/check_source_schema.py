@@ -8,6 +8,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from src.database.io import query_to_dataframe
+from src.database.connection import get_engine
 
 
 REQUIRED_SOURCE_COLUMNS = {
@@ -83,6 +84,22 @@ def find_missing_source_columns(
 
 
 def main() -> None:
+    database_url = get_engine().url
+    print(
+        "Database target (host/database only; credentials redacted): "
+        f"{database_url.host}/{database_url.database}"
+    )
+    source_counts = query_to_dataframe("""
+        SELECT
+            (SELECT COUNT(*) FROM public.olist_orders) AS source_orders,
+            (SELECT COUNT(DISTINCT customer_unique_id) FROM public.olist_customers)
+                AS source_customers
+    """)
+    print("Olist source population:")
+    print(source_counts.to_string(index=False))
+    if int(source_counts.iloc[0]["source_orders"]) < 90_000:
+        raise SystemExit("Source database does not contain the full Olist orders extract.")
+
     source_columns = query_to_dataframe("""
         SELECT table_name, column_name
         FROM information_schema.columns
