@@ -266,7 +266,7 @@ These are database cohort-audit counts, not final v5 train/validation/test metri
 
 ### Model selection and evaluation design
 
-Three candidate families are compared: Logistic Regression, HistGradientBoosting and Random Forest. Hyperparameters are selected by **expanding-window, date-grouped, 90-day-purged temporal cross-validation**, optimizing average precision for the second-purchase event. A separate chronological validation period is used for model calibration and the operating threshold; the latest chronological holdout is not used for model, calibration or threshold selection.
+Three ML candidate families (Logistic Regression, HistGradientBoosting and Random Forest) compete with three point-in-time RFM scorers (recency-only, recent-frequency-only and lifetime-frequency-only). Every candidate is evaluated with the same temporal folds; the selected approach must beat the simple baselines in cross-validation before it is considered useful. Hyperparameters are selected by **expanding-window, date-grouped, 90-day-purged temporal cross-validation**, optimizing average precision for the second-purchase event. A separate chronological validation period is used for model calibration and the operating threshold; the latest chronological holdout is not used for model, calibration or threshold selection.
 
 The v5 evaluation adds the measures needed to judge a campaign-ranking system rather than a single arbitrary classification threshold:
 
