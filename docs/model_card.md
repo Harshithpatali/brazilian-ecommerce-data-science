@@ -45,6 +45,23 @@ probability is its complement. The repeat-purchase threshold is selected on
 a separate validation period by maximum F2 (beta=2, recall-weighted) and
 converted to the complementary churn-probability cutoff for the dashboard.
 
+### Observed v4 holdout performance
+
+The selected HistGradientBoosting model achieved repeat-purchase PR-AUC 0.0472
+and ROC-AUC 0.6555 on the final chronological test set. The prior-prevalence
+dummy PR-AUC was 0.0242. At the validation-selected F2 threshold, repeat-
+purchase precision was 3.62%, recall 65.18%, F1 0.0686 and F2 0.1482.
+Balanced accuracy was 61.05% and Matthews correlation was 0.0685.
+
+The test set contained 112 repeat-purchase snapshots out of 4,620 (2.42%).
+The confusion matrix was TP=73, FN=39, FP=1,942 and TN=2,566. Thus 43.6% of
+test rows were flagged, and most flagged rows were false positives. PR-AUC
+was above prevalence but remains low in absolute terms.
+
+Relative to the v3 holdout, recall improved from 7.14% to 65.18% and PR-AUC
+from 0.0377 to 0.0472, while precision fell from 5.84% to 3.62%. These results
+show a meaningful recall/precision trade-off, not a production-ready model.
+
 Reports include repeat-purchase prevalence, PR-AUC, ROC-AUC, both classes'
 precision/recall/F1, F2, balanced accuracy, Matthews correlation coefficient,
 confusion matrix, and a prior-probability dummy baseline. PR-AUC must be
@@ -57,5 +74,6 @@ compared with repeat-purchase prevalence.
   not unseen-customer generalization.
 - Eventual delivery status is used retrospectively to define delivered events.
 - F2 threshold selection favors recall but does not encode monetary
-  intervention costs or false-positive costs.
+  intervention costs or false-positive costs. A production decision needs
+  a validation-selected precision floor or a known contact-capacity limit.
 - The Olist dataset is historical and does not represent a live feed.
