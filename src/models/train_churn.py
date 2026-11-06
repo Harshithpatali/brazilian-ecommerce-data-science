@@ -378,27 +378,37 @@ def _fit_oof_platt_calibrator(
     return calibrator, int(valid.sum())
 
 
+def _quantile_calibration_groups(
+    probabilities: np.ndarray,
+    n_bins: int = 10,
+) -> list[np.ndarray]:
+    """Create approximately equal-count reliability groups by prediction rank."""
+    p = np.asarray(probabilities, dtype=float)
+    if p.ndim != 1 or not np.isfinite(p).all():
+        raise ValueError("probabilities must be one-dimensional and finite.")
+    if len(p) == 0:
+        return []
+    order = np.argsort(p, kind="mergesort")
+    return [group for group in np.array_split(order, min(n_bins, len(order))) if len(group)]
+
+
 def _expected_calibration_error(
     y_true: np.ndarray,
     probabilities: np.ndarray,
     n_bins: int = 10,
 ) -> float:
-    """Expected calibration error using equal-width probability bins."""
+    """Expected calibration error using equal-frequency prediction bins."""
     y = np.asarray(y_true, dtype=int)
     p = np.asarray(probabilities, dtype=float)
-    edges = np.linspace(0.0, 1.0, n_bins + 1)
-    total = max(len(y), 1)
+    if len(y) != len(p):
+        raise ValueError("y_true and probabilities must have the same length.")
+    if len(y) == 0:
+        return float("nan")
     error = 0.0
-    for index in range(n_bins):
-        lower, upper = edges[index], edges[index + 1]
-        if index == n_bins - 1:
-            mask = (p >= lower) & (p <= upper)
-        else:
-            mask = (p >= lower) & (p < upper)
-        if mask.any():
-            error += float(mask.sum()) / total * abs(
-                float(p[mask].mean()) - float(y[mask].mean())
-            )
+    for indices in _quantile_calibration_groups(p, n_bins=n_bins):
+        error += float(len(indices)) / len(y) * abs(
+            float(p[indices].mean()) - float(y[indices].mean())
+        )
     return float(error)
 
 
@@ -407,23 +417,20 @@ def _calibration_bins(
     probabilities: np.ndarray,
     n_bins: int = 10,
 ) -> pd.DataFrame:
-    """Return reliability-diagram values for the final test set."""
+    """Return equal-frequency reliability-diagram values for the final test set."""
     y = np.asarray(y_true, dtype=int)
     p = np.asarray(probabilities, dtype=float)
-    edges = np.linspace(0.0, 1.0, n_bins + 1)
+    if len(y) != len(p):
+        raise ValueError("y_true and probabilities must have the same length.")
     rows = []
-    for index in range(n_bins):
-        lower, upper = edges[index], edges[index + 1]
-        mask = ((p >= lower) & (p <= upper)) if index == n_bins - 1 else (
-            (p >= lower) & (p < upper)
-        )
+    for index, indices in enumerate(_quantile_calibration_groups(p, n_bins=n_bins), start=1):
         rows.append({
-            "bin": index + 1,
-            "lower_probability": lower,
-            "upper_probability": upper,
-            "count": int(mask.sum()),
-            "mean_predicted_probability": float(p[mask].mean()) if mask.any() else np.nan,
-            "observed_purchase_rate": float(y[mask].mean()) if mask.any() else np.nan,
+            "bin": index,
+            "lower_probability": float(p[indices].min()),
+            "upper_probability": float(p[indices].max()),
+            "count": int(len(indices)),
+            "mean_predicted_probability": float(p[indices].mean()),
+            "observed_purchase_rate": float(y[indices].mean()),
         })
     return pd.DataFrame(rows)
 
@@ -710,6 +717,27 @@ def main() -> None:
     lifetime_baseline_pr_auc = float(average_precision_score(
         y_test_repeat, X_test["lifetime_delivered_orders"].fillna(0).to_numpy()
     ))
+    prior_repeat_probability = float(dummy_repeat_probability[0])
+    test_metrics["prior_dummy_brier_score"] = float(
+        brier_score_loss(
+            y_test_repeat,
+            np.full(len(y_test_repeat), prior_repeat_probability, dtype=float),
+        )
+    )
+    test_metrics["prior_dummy_log_loss"] = float(log_loss(
+        y_test_repeat,
+        np.column_stack([
+            np.full(len(y_test_repeat), prior_repeat_probability, dtype=float),
+            np.full(len(y_test_repeat), 1.0 - prior_repeat_probability, dtype=float),
+        ]),
+        labels=[0, 1],
+    ))
+    test_metrics["mean_predicted_repeat_probability"] = float(
+        test_repeat_probability.mean()
+    )
+    test_metrics["predicted_to_observed_rate_ratio"] = float(
+        test_repeat_probability.mean() / max(float(y_test_repeat.mean()), 1e-12)
+    )
     test_metrics["dummy_baseline_pr_auc"] = dummy_pr_auc
     test_metrics["recency_baseline_pr_auc"] = recency_baseline_pr_auc
     test_metrics["frequency_baseline_pr_auc"] = frequency_baseline_pr_auc
@@ -763,6 +791,11 @@ def main() -> None:
         "rows": int(unseen_mask.sum()),
         "customers": int(test_customer_ids[unseen_mask].nunique()),
     }
+    known_mask = ~unseen_mask
+    known_metrics: dict[str, Any] = {
+        "rows": int(known_mask.sum()),
+        "customers": int(test_customer_ids[known_mask].nunique()),
+    }
     if unseen_mask.any():
         unseen_metrics.update(_ranking_summary(
             y_test_repeat[unseen_mask],
@@ -777,6 +810,21 @@ def main() -> None:
             )["precision"]
         else:
             unseen_metrics["precision_at_10pct_capacity"] = None
+
+    if known_mask.any():
+        known_metrics.update(_ranking_summary(
+            y_test_repeat[known_mask],
+            test_repeat_probability[known_mask],
+        ))
+        if len(np.unique(y_test_repeat[known_mask])) == 2:
+            known_metrics["precision_at_10pct_capacity"] = _monthly_capacity_metrics(
+                y_test_repeat[known_mask],
+                test_repeat_probability[known_mask],
+                test_dates[known_mask],
+                0.10,
+            )["precision"]
+        else:
+            known_metrics["precision_at_10pct_capacity"] = None
 
     predictions = pd.DataFrame({
         "customer_unique_id": test_customer_ids.to_numpy(),
@@ -926,6 +974,7 @@ def main() -> None:
         "baseline_capacity_metrics": baseline_capacity_metrics,
         "customer_cluster_bootstrap_pr_auc_ci95": cluster_bootstrap_ci,
         "unseen_customer_test_metrics": unseen_metrics,
+        "known_customer_test_metrics": known_metrics,
         "baseline_metrics": {
             "prior_dummy_pr_auc": dummy_pr_auc,
             "recency_only_pr_auc": recency_baseline_pr_auc,
@@ -1007,6 +1056,7 @@ def main() -> None:
     print("Monthly contact-capacity metrics:", json.dumps(capacity_metrics, indent=2))
     print("Customer-clustered PR-AUC 95% CI:", json.dumps(cluster_bootstrap_ci, indent=2))
     print("Unseen-customer test results:", json.dumps(unseen_metrics, indent=2))
+    print("Known-customer test results:", json.dumps(known_metrics, indent=2))
 
 
 if __name__ == "__main__":
