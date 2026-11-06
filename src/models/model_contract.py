@@ -37,6 +37,20 @@ def validate_model_metadata(metadata: dict[str, Any]) -> list[str]:
     if metadata.get("feature_columns") != FEATURE_COLS:
         errors.append("feature_columns do not match the application's feature contract.")
 
+    availability = metadata.get("feature_availability")
+    if not isinstance(availability, dict):
+        errors.append("feature_availability is missing or is not an object.")
+    elif availability.get("review_score") != "review_answer_timestamp < snapshot_date":
+        errors.append("review_score must use review_answer_timestamp as its availability time.")
+
+    model_hash = metadata.get("model_sha256")
+    if (
+        not isinstance(model_hash, str)
+        or len(model_hash) != 64
+        or any(character not in "0123456789abcdef" for character in model_hash)
+    ):
+        errors.append("model_sha256 must be a 64-character lowercase SHA-256 digest.")
+
     threshold = metadata.get("threshold")
     if not isinstance(threshold, (int, float)) or not isfinite(float(threshold)):
         errors.append("threshold must be a finite number.")
@@ -78,6 +92,28 @@ def validate_model_metadata(metadata: dict[str, Any]) -> list[str]:
                 errors.append(f"dummy_baseline.{name} must be a finite number.")
             elif not 0 <= float(value) <= 1:
                 errors.append(f"dummy_baseline.{name} must be between 0 and 1.")
+        if isinstance(metrics, dict):
+            metric_baseline = metrics.get("dummy_baseline_pr_auc")
+            baseline_ap = baseline.get("test_pr_auc")
+            if (
+                isinstance(metric_baseline, (int, float))
+                and isinstance(baseline_ap, (int, float))
+                and abs(float(metric_baseline) - float(baseline_ap)) > 1e-9
+            ):
+                errors.append("Dummy PR-AUC differs between test_metrics and dummy_baseline.")
+            metric_prevalence = metrics.get("positive_prevalence")
+            baseline_prevalence = baseline.get("test_positive_prevalence")
+            if (
+                isinstance(metric_prevalence, (int, float))
+                and isinstance(baseline_prevalence, (int, float))
+                and abs(float(metric_prevalence) - float(baseline_prevalence)) > 1e-9
+            ):
+                errors.append("Test positive prevalence differs from the dummy baseline prevalence.")
+            lift = metrics.get("pr_auc_lift_over_dummy")
+            pr_auc = metrics.get("pr_auc")
+            if all(isinstance(value, (int, float)) for value in (lift, pr_auc, baseline_ap)):
+                if abs(float(lift) - (float(pr_auc) - float(baseline_ap))) > 1e-9:
+                    errors.append("PR-AUC lift is inconsistent with the model and dummy scores.")
 
     distribution = metadata.get("class_distribution")
     if not isinstance(distribution, dict):
@@ -107,6 +143,11 @@ def validate_model_metadata(metadata: dict[str, Any]) -> list[str]:
             embargo = int(periods.get("label_horizon_embargo_days", 90))
             if embargo < 0:
                 raise ValueError("Embargo cannot be negative.")
+            train_start = date.fromisoformat(str(periods["train_start"]))
+            validation_end = date.fromisoformat(str(periods["validation_end"]))
+            test_end = date.fromisoformat(str(periods["test_end"]))
+            if not train_start <= train_end < validation_start <= validation_end < test_start <= test_end:
+                errors.append("Train, validation, and test periods are not strictly chronological.")
             if train_end + timedelta(days=embargo) > validation_start:
                 errors.append("Training and validation label windows overlap.")
             if validation_end + timedelta(days=embargo) > test_start:
