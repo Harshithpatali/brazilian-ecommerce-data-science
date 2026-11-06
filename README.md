@@ -282,8 +282,10 @@ flowchart LR
     B --> C["Date-grouped expanding-window CV<br/>+ GridSearchCV"]
     C --> D1[Logistic Regression]
     C --> D3[HistGradientBoosting]
-    D1 --> E["Select using mean CV PR-AUC"]
+    C --> D4[Random Forest]
+    D1 --> E["Select using mean CV PR-AUC for repeat purchase"]
     D3 --> E
+    D4 --> E
     E --> V["Choose threshold on validation<br/>by repeat-purchase F2"]
     V --> T["Evaluate frozen model once<br/>on final chronological test"]
     T --> G[("models/best_churn_model.joblib")]
@@ -300,7 +302,40 @@ Temporal-CV runs, hyperparameters and final selected-model evaluation are tracke
 
 See [`docs/churn_methodology.md`](docs/churn_methodology.md), [`docs/ml_modeling.md`](docs/ml_modeling.md), and [`docs/model_card.md`](docs/model_card.md) for full details, including known limitations.
 
-> The model artifacts currently committed to the repository predate the corrected `churn-pit-v4` pipeline. The Churn page remains disabled until the PostgreSQL dataset is rebuilt and the corrected model artifacts are generated with `python -m scripts.run_ml`.
+### v4 final chronological holdout results
+
+The retrained v4 model selected **HistGradientBoosting** using purged,
+date-grouped CV PR-AUC for repeat purchase. Its mean CV PR-AUC was **0.0945**
+(HistGradientBoosting), versus **0.0672** (Random Forest) and **0.0614**
+(Logistic Regression).
+
+| Final test metric | v4 result |
+|---|---:|
+| Repeat-purchase PR-AUC | **0.0472** |
+| Prior-prevalence dummy PR-AUC | 0.0242 |
+| Repeat-purchase ROC-AUC | 0.6555 |
+| Repeat-purchase precision | 3.62% |
+| Repeat-purchase recall | **65.18%** |
+| Repeat-purchase F1 | 0.0686 |
+| Repeat-purchase F2 | 0.1482 |
+| Balanced accuracy | 61.05% |
+| Matthews correlation | 0.0685 |
+
+The v4 test set contains 4,620 snapshots, including 112 repeat-purchase
+positives (2.42%). At the validation-selected F2 threshold, the confusion
+matrix is 73 true positives, 39 missed repeat purchases, 1,942 false
+positives and 2,566 true negatives. The model flags 2,015 of 4,620 test rows
+(43.6%); only 3.62% of flagged rows are repeat purchasers.
+
+Relative to v3, repeat-purchase recall increased from 7.14% to 65.18%, and
+PR-AUC increased from 0.0377 to 0.0472. Precision declined from 5.84% to
+3.62%. This is a recall-oriented research result, **not a production-ready
+customer targeting rule**. Before campaign use, choose a precision floor or
+customer-contact capacity and select the operating threshold on validation
+data to match that constraint. Do not tune that threshold on the final test.
+
+The v4 dataset and model artifacts are committed in the branch. The Churn
+dashboard now requires a matching `churn-pit-v4` model and metadata contract.
 
 ## 📊 Statistical Analysis
 
