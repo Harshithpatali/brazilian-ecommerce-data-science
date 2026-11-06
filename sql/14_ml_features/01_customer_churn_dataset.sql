@@ -12,6 +12,7 @@ DROP TABLE IF EXISTS ml.delivered_orders CASCADE;
 DROP TABLE IF EXISTS ml.customer_monthly_activity CASCADE;
 DROP TABLE IF EXISTS ml.customer_snapshot_calendar CASCADE;
 DROP TABLE IF EXISTS ml.customer_churn_dataset CASCADE;
+DROP TABLE IF EXISTS ml.review_events CASCADE;
 
 CREATE TABLE ml.delivered_orders AS
 SELECT
@@ -34,6 +35,15 @@ CREATE INDEX idx_ml_delivered_customer_delivery
 CREATE INDEX idx_ml_delivered_purchase
     ON ml.delivered_orders (order_purchase_timestamp);
 ANALYZE ml.delivered_orders;
+
+/* Point-in-time review events support efficient as-of review features. */
+CREATE TABLE ml.review_events AS
+SELECT order_id, review_score, review_creation_date
+FROM public.olist_order_reviews
+WHERE order_id IS NOT NULL AND review_creation_date IS NOT NULL;
+CREATE INDEX idx_ml_review_order_date
+    ON ml.review_events (order_id, review_creation_date);
+ANALYZE ml.review_events;
 
 CREATE TABLE ml.customer_monthly_activity AS
 SELECT
@@ -177,7 +187,7 @@ CROSS JOIN LATERAL (
 LEFT JOIN LATERAL (
     SELECT AVG(r.review_score)::numeric AS avg_review_score_180d
     FROM ml.delivered_orders d
-    JOIN public.olist_order_reviews r ON r.order_id = d.order_id
+    JOIN ml.review_events r ON r.order_id = d.order_id
     WHERE d.customer_unique_id = s.customer_unique_id
       AND d.order_purchase_timestamp >= s.snapshot_date - INTERVAL '180 days'
       AND d.order_purchase_timestamp < s.snapshot_date
