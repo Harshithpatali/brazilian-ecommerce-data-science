@@ -14,6 +14,11 @@ _REQUIRED_METRICS = (
     "precision",
     "recall",
     "f1",
+    "class_0_precision",
+    "class_0_recall",
+    "class_0_f1",
+    "balanced_accuracy",
+    "matthews_corrcoef",
     "positive_prevalence",
     "threshold",
     "dummy_baseline_pr_auc",
@@ -67,7 +72,9 @@ def validate_model_metadata(metadata: dict[str, Any]) -> list[str]:
                 errors.append(f"test_metrics.{name} must be a finite number.")
         bounded_metrics = (
             "roc_auc", "pr_auc", "precision", "recall", "f1",
-            "positive_prevalence", "threshold", "dummy_baseline_pr_auc",
+            "class_0_precision", "class_0_recall", "class_0_f1",
+            "balanced_accuracy", "positive_prevalence", "threshold",
+            "dummy_baseline_pr_auc",
         )
         for name in bounded_metrics:
             value = metrics.get(name)
@@ -75,6 +82,10 @@ def validate_model_metadata(metadata: dict[str, Any]) -> list[str]:
                 if not 0 <= float(value) <= 1:
                     errors.append(f"test_metrics.{name} must be between 0 and 1.")
         metric_threshold = metrics.get("threshold")
+        mcc = metrics.get("matthews_corrcoef")
+        if isinstance(mcc, (int, float)) and isfinite(float(mcc)):
+            if not -1 <= float(mcc) <= 1:
+                errors.append("test_metrics.matthews_corrcoef must be between -1 and 1.")
         if (
             isinstance(metric_threshold, (int, float))
             and isinstance(threshold, (int, float))
