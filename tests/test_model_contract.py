@@ -9,6 +9,10 @@ def valid_metadata():
         "pipeline_status": "ready",
         "model_version": MODEL_VERSION,
         "feature_columns": FEATURE_COLS,
+        "feature_availability": {
+            "review_score": "review_answer_timestamp < snapshot_date"
+        },
+        "model_sha256": "a" * 64,
         "threshold": 0.44,
         "test_metrics": {
             "roc_auc": 0.72,
@@ -32,10 +36,12 @@ def valid_metadata():
             "test": {"0": 20, "1": 35},
         },
         "periods": {
+            "train_start": "2016-09-01",
             "train_end": "2017-01-01",
             "validation_start": "2017-04-01",
             "validation_end": "2017-06-01",
             "test_start": "2017-08-30",
+            "test_end": "2017-12-01",
             "label_horizon_embargo_days": "90",
         },
     }
