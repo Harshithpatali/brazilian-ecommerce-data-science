@@ -70,7 +70,7 @@ def chronological_partition_indices(
         raise ValueError("horizon_days must be positive.")
 
     row_dates = _dates(snapshot_dates)
-    unique = np.array(sorted(row_dates.unique()))
+    unique = pd.DatetimeIndex(sorted(row_dates.unique())).to_numpy(dtype="datetime64[ns]")
     if len(unique) < 12:
         raise ValueError(
             "At least 12 unique snapshot dates are required for purged "
@@ -136,7 +136,7 @@ def make_date_grouped_splits(
     if horizon_days <= 0:
         raise ValueError("horizon_days must be positive.")
     row_dates = _dates(snapshot_dates)
-    unique = np.array(sorted(row_dates.unique()))
+    unique = pd.DatetimeIndex(sorted(row_dates.unique())).to_numpy(dtype="datetime64[ns]")
     if n_splits < 2 or len(unique) < n_splits + 5:
         raise ValueError("Not enough unique dates for purged temporal CV.")
 
