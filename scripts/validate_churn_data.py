@@ -138,6 +138,8 @@ def main() -> None:
                  OR snapshot_month IS NULL
                  OR snapshot_month < 1
                  OR snapshot_month > 12
+                 OR snapshot_month <> EXTRACT(MONTH FROM snapshot_date)::integer
+                 OR lifetime_delivered_orders < 1
            ) FROM ml.customer_churn_dataset) AS invalid_categorical_feature_rows,
           (SELECT COUNT(*)
            FROM ml.customer_churn_dataset dataset
