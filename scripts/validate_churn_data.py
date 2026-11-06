@@ -10,6 +10,36 @@ if str(ROOT) not in sys.path:
 from src.database.io import query_to_dataframe
 
 
+EXPECTED_ZERO_CHECKS = (
+    "duplicate_keys",
+    "target_mismatches",
+    "invalid_feature_rows",
+    "incomplete_label_windows",
+    "review_feature_mismatches",
+)
+
+
+def assert_zero_integrity_checks(checks: dict[str, object]) -> None:
+    """Fail validation if an integrity check is missing or non-zero."""
+    missing = [name for name in EXPECTED_ZERO_CHECKS if name not in checks]
+    if missing:
+        raise SystemExit(f"Validation result is missing checks: {missing}")
+
+    violations = {}
+    for name in EXPECTED_ZERO_CHECKS:
+        try:
+            count = int(checks[name])
+        except (TypeError, ValueError) as exc:
+            raise SystemExit(
+                f"Validation check {name!r} did not return an integer."
+            ) from exc
+        if count != 0:
+            violations[name] = count
+
+    if violations:
+        raise SystemExit(f"Churn data validation failed: {violations}")
+
+
 def main() -> None:
     summary = query_to_dataframe("""
         SELECT COUNT(*) AS rows,
@@ -96,6 +126,8 @@ def main() -> None:
     """)
     print("\nIntegrity checks (all counts should be zero)")
     print(checks.to_string(index=False))
+    assert_zero_integrity_checks(checks.iloc[0].to_dict())
+    print("\nAll churn dataset integrity checks passed.")
 
 
 if __name__ == "__main__":
