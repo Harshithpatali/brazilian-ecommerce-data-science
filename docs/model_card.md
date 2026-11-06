@@ -1,81 +1,44 @@
-# Model Card — Forward-Looking Customer Churn
+# Model Card — Repeat-Purchase Propensity v5
 
 ## Status
 
-The corrected pipeline version is churn-pit-v4. The refreshed dataset,
-model, metadata, candidate comparison, holdout predictions, classification
-report, confusion matrix and precision-recall curve are committed to the
-v4 feature branch. Merge PR #4 before deploying this version to the default
-branch or the Streamlit application.
+Version: \`churn-pit-v5\`.
+
+The v5 candidate pipeline is designed for monthly customer CRM ranking across customers after their first delivered purchase. Final holdout metrics will be recorded here only after the v5 GitHub Actions rebuild, integrity validation, training, fitted-model hash verification and artifact commit complete.
 
 ## Intended use
 
-Portfolio demonstration of point-in-time customer analytics and 90-day
-delivered-purchase inactivity risk for customers with at least two previous
-delivered orders and delivered activity in the prior 180 days.
+Offline analysis and demonstration of monthly repeat-purchase propensity ranking for historical Olist customers. The intended decision is to prioritize a limited fraction of active customers for possible CRM contact.
 
-This is not a production decision system and should not automatically deny
-service or make consequential decisions about customers.
+This model is not a live feed, a production-ready offer policy or a causal uplift estimator. It must not be used to deny service or make consequential decisions.
 
-## Target
+## Population and target
 
-churned = 1 when no eventually-delivered order has a purchase timestamp in
-the half-open interval from the snapshot date up to, but not including, 90
-days after the snapshot. A purchase exactly on the 90-day boundary is outside.
+One row represents a customer-month decision. Customers become eligible after their first delivered order and must have at least one order purchased and delivered within the prior 180 days.
 
-## Features
+\`churned = 0\` means an eventually-delivered order has a purchase timestamp in the next 90 days. \`churned = 1\` means no such order exists. The target window is half-open: [snapshot_date, snapshot_date + 90 days).
 
-Short-term order activity uses the 180 days before the snapshot, while a
-separate prior 180-day window supplies purchase-frequency and revenue trends.
-Lifetime delivered-order count, customer tenure and interpurchase-gap
-statistics use only orders purchased and delivered before the snapshot.
-Identical purchase timestamps are represented by a zero-gap share; positive
-gap summaries remain missing when no positive interpurchase interval exists.
-Review scores are included only when their review-answer timestamps precede
-the snapshot. Future observations are used only to construct the target.
+The population can contain repeated rows for the same customer across different months. Uncertainty intervals therefore use customer-cluster bootstrap resampling.
 
-## Class balance and evaluation
+A read-only preflight of the expanded first-delivery population found 357,413 customer-month decisions across 79,594 customers, including 2,686 repeat-purchase decisions (0.75%). These are preliminary preflight counts, not final v5 artifact counts.
 
-The rebuilt dataset contains 306 repeat-purchase snapshots out of 10,570
-(2.89%); 97.11% have no delivered purchase in the next 90 days. Model family
-and hyperparameters are selected with expanding-window temporal CV average
-precision for the minority repeat-purchase event (churned = 0).
+## Features and leakage control
 
-The candidate families are Logistic Regression, HistGradientBoosting and
-Random Forest. The estimator outputs churn probability; repeat-purchase
-probability is its complement. The repeat-purchase threshold is selected on
-a separate validation period by maximum F2 (beta=2, recall-weighted) and
-converted to the complementary churn-probability cutoff for the dashboard.
+The 29-feature contract contains 27 numeric behavioral/value features and categorical customer state and snapshot month. Customer state is taken from the most recent delivered order observable before the snapshot. Purchase and delivery dates used as historical features are strictly before the snapshot. Review score is included only when its answer timestamp precedes the snapshot. Future orders are used only to form the target.
 
-### Observed v4 holdout performance
+## Model candidates and evaluation
 
-The selected HistGradientBoosting model achieved repeat-purchase PR-AUC 0.0472
-and ROC-AUC 0.6555 on the final chronological test set. The prior-prevalence
-dummy PR-AUC was 0.0242. At the validation-selected F2 threshold, repeat-
-purchase precision was 3.62%, recall 65.18%, F1 0.0686 and F2 0.1482.
-Balanced accuracy was 61.05% and Matthews correlation was 0.0685.
+Candidate models: Logistic Regression, HistGradientBoosting, Random Forest and CatBoost. Model selection uses expanding-window date-grouped temporal CV, purged by the 90-day target horizon. Every fit and validation fold must contain at least 15 repeat-purchase and 15 no-purchase examples.
 
-The test set contained 112 repeat-purchase snapshots out of 4,620 (2.42%).
-The confusion matrix was TP=73, FN=39, FP=1,942 and TN=2,566. Thus 43.6% of
-test rows were flagged, and most flagged rows were false positives. PR-AUC
-was above prevalence but remains low in absolute terms.
+The selected model is calibrated with a Platt sigmoid fitted on the separate chronological validation period. The final chronological holdout is reserved for evaluation only.
 
-Relative to the v3 holdout, recall improved from 7.14% to 65.18% and PR-AUC
-from 0.0377 to 0.0472, while precision fell from 5.84% to 3.62%. These results
-show a meaningful recall/precision trade-off, not a production-ready model.
-
-Reports include repeat-purchase prevalence, PR-AUC, ROC-AUC, both classes'
-precision/recall/F1, F2, balanced accuracy, Matthews correlation coefficient,
-confusion matrix, and a prior-probability dummy baseline. PR-AUC must be
-compared with repeat-purchase prevalence.
+The operational benchmark is top-10% monthly capacity. Top-5% and top-20% results are also recorded. Evaluation includes PR-AUC, ROC-AUC, prior-prevalence and recency baselines, Brier score, log loss, Brier skill score, calibration deciles, precision, recall, F1, F2, balanced accuracy, Matthews correlation, capacity precision/recall/lift, confusion matrix and a customer-cluster bootstrap 95% PR-AUC interval.
 
 ## Limitations
 
-- Evaluation allows customers in earlier training periods and later
-  evaluation periods. It measures future prediction for known customers,
-  not unseen-customer generalization.
-- Eventual delivery status is used retrospectively to define delivered events.
-- F2 threshold selection favors recall but does not encode monetary
-  intervention costs or false-positive costs. A production decision needs
-  a validation-selected precision floor or a known contact-capacity limit.
-- The Olist dataset is historical and does not represent a live feed.
+- Olist is a historical marketplace dataset, not a live stream.
+- The model ranks purchase propensity; it does not estimate incremental treatment effect.
+- Known-customer temporal evaluation does not establish unseen-customer generalization.
+- Customer-month rows are repeated observations; confidence intervals must preserve customer clusters.
+- A campaign decision requires controlled experiments, margin and incentive economics, contact-cost constraints, customer consent and operational monitoring.
+- If the model does not improve materially on the recency-only benchmark or fails probability calibration, it should not be presented as a useful targeting model.
