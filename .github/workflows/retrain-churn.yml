@@ -122,6 +122,16 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # Do not publish artifacts generated from a stale source commit.
+          git fetch origin fix/churn-dashboard-and-data-contracts
+          LOCAL_SOURCE_SHA="$(git rev-parse HEAD)"
+          REMOTE_SOURCE_SHA="$(git rev-parse FETCH_HEAD)"
+          if [[ "$LOCAL_SOURCE_SHA" != "$REMOTE_SOURCE_SHA" ]]; then
+            echo "::warning::The source branch advanced while this model was training. Discarding stale artifacts; the latest branch commit must be retrained."
+            exit 1
+          fi
+
           git add \
             data/ml/customer_churn_dataset.parquet \
             models/best_churn_model.joblib \
@@ -130,6 +140,7 @@ jobs:
             models/test_confusion_matrix.json \
             models/test_precision_recall_curve.csv \
             models/test_capacity_metrics.json \
+            models/test_baseline_capacity_metrics.json \
             models/test_calibration_bins.csv
           # Evaluation outputs are intentionally gitignored for routine runs;
           # publish the selected holdout predictions and class report explicitly.
