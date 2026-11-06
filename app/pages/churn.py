@@ -9,154 +9,171 @@ import streamlit as st
 
 from app.components.ui import hero, metric_card, section_title
 from src.features.churn_features import FEATURE_COLS, add_churn_features
+from src.models.train_churn import MODEL_VERSION
 
 ROOT = Path(__file__).resolve().parents[2]
 DATA_PATH = ROOT / "data" / "ml" / "customer_churn_dataset.parquet"
 MODEL_PATH = ROOT / "models" / "best_churn_model.joblib"
-METRICS_PATH = ROOT / "models" / "model_metadata.json"
+METADATA_PATH = ROOT / "models" / "model_metadata.json"
 COMPARISON_PATH = ROOT / "models" / "model_comparison.csv"
 
 
 @st.cache_data
-
 def load_features() -> pd.DataFrame:
     if not DATA_PATH.exists():
-        raise FileNotFoundError(
-            "ML dataset not found. Run `python -m scripts.run_ml`."
-        )
+        raise FileNotFoundError("Build the SQL churn dataset and run scripts.build_ml_data.")
     return pd.read_parquet(DATA_PATH)
 
 
 @st.cache_resource
-
 def load_model():
-    if not MODEL_PATH.exists():
-        return None
-    return joblib.load(MODEL_PATH)
+    return joblib.load(MODEL_PATH) if MODEL_PATH.exists() else None
 
 
 @st.cache_data
-
 def load_metadata() -> dict:
-    if not METRICS_PATH.exists():
+    if not METADATA_PATH.exists():
         return {}
-    return json.loads(METRICS_PATH.read_text(encoding="utf-8"))
+    return json.loads(METADATA_PATH.read_text(encoding="utf-8"))
 
 
 @st.cache_data
-
 def load_comparison() -> pd.DataFrame:
-    if not COMPARISON_PATH.exists():
-        return pd.DataFrame()
-    return pd.read_csv(COMPARISON_PATH)
+    return pd.read_csv(COMPARISON_PATH) if COMPARISON_PATH.exists() else pd.DataFrame()
 
 
 def render() -> None:
     hero(
         "Customer Churn Intelligence",
-        "Tuned machine-learning models scored against point-in-time customer behavior.",
+        "Historical point-in-time customer scoring using a 90-day forward inactivity target.",
     )
+    metadata = load_metadata()
+    if metadata.get("model_version") != MODEL_VERSION or metadata.get("pipeline_status") != "ready":
+        st.warning(
+            "The checked-in churn model predates the corrected target and evaluation "
+            "workflow. Rebuild the PostgreSQL churn dataset, run the corrected training "
+            "pipeline, and redeploy the resulting model artifacts before using this page."
+        )
+        st.code(
+            "python -m scripts.build_all\n"
+            "python -m scripts.validate_churn_data\n"
+            "python -m scripts.run_ml",
+            language="bash",
+        )
+        return
 
     model = load_model()
-    metadata = load_metadata()
-    comparison = load_comparison()
-    if model is None or not metadata:
-        st.warning(
-            "The tuned model has not been trained yet. Run `python -m scripts.run_ml` "
-            "from the project root."
-        )
+    if model is None:
+        st.warning("The selected model artifact is missing. Run the training pipeline.")
         return
 
     df = load_features().copy()
     if df.empty:
-        st.info("No ML data is available.")
+        st.info("No historical churn snapshots are available.")
         return
-
     df["snapshot_date"] = pd.to_datetime(df["snapshot_date"], errors="coerce")
+    df = df.dropna(subset=["snapshot_date"])
     latest_date = df["snapshot_date"].max()
     latest = df[df["snapshot_date"] == latest_date].copy()
     if latest.empty:
-        st.info("No latest snapshot is available.")
+        st.info("No latest historical snapshot is available.")
         return
 
-    latest_features = add_churn_features(latest)
-    latest["churn_probability"] = model.predict_proba(
-        latest_features[FEATURE_COLS]
-    )[:, 1]
+    features = add_churn_features(latest)
+    missing = sorted(set(FEATURE_COLS).difference(features.columns))
+    if missing:
+        st.error(f"Scoring dataset is missing features: {missing}")
+        return
+    latest["churn_probability"] = model.predict_proba(features[FEATURE_COLS])[:, 1]
 
-    threshold = float(metadata.get("threshold", 0.50))
+    threshold = float(metadata["threshold"])
     high_risk = latest[latest["churn_probability"] >= threshold].copy()
-    avg_risk = latest["churn_probability"].mean()
+    st.info(
+        "This is a historical Olist dataset demonstration, not a live customer feed. "
+        "Predictions refer to the latest snapshot available in the sample data."
+    )
 
-    cols = st.columns(4)
-    vals = [
-        ("Best Model", metadata.get("selected_model", "N/A"), "Selected by PR-AUC", "blue"),
-        ("Latest Snapshot", str(latest_date.date()), "Prediction population", "violet"),
-        ("Avg Churn Risk", f"{avg_risk:.1%}", "Latest snapshot", "teal"),
-        ("High-Risk Customers", f"{len(high_risk):,}", f"Risk ≥ {threshold:.0%}", "amber"),
+    columns = st.columns(4)
+    cards = [
+        ("Selected Model", metadata.get("selected_model", "N/A"), "Selected by temporal CV PR-AUC", "blue"),
+        ("Latest Snapshot", str(latest_date.date()), "Historical prediction population", "violet"),
+        ("Average Predicted Risk", f"{latest['churn_probability'].mean():.1%}", "Latest snapshot", "teal"),
+        ("Customers Above Threshold", f"{len(high_risk):,}", f"Risk ≥ {threshold:.1%}", "amber"),
     ]
-    for col, (label, value, help_text, accent) in zip(cols, vals):
-        with col:
+    for column, (label, value, help_text, accent) in zip(columns, cards):
+        with column:
             metric_card(label, value, help_text=help_text, accent=accent)
 
+    test = metadata.get("test_metrics", {})
+    baseline = metadata.get("dummy_baseline", {})
     section_title(
-        "Model benchmark",
-        "Two classifiers were tuned with expanding-window temporal cross-validation. The latest snapshots remain an untouched test period.",
+        "Final chronological test evaluation",
+        "The selected model and threshold were frozen before this final holdout was evaluated.",
+    )
+    metric_columns = st.columns(4)
+    values = [
+        ("Test PR-AUC", test.get("pr_auc"), "Average precision"),
+        ("Dummy PR-AUC", baseline.get("test_pr_auc"), "Prior-probability baseline"),
+        ("Test ROC-AUC", test.get("roc_auc"), "Threshold independent"),
+        ("Test F1", test.get("f1"), f"Validation threshold {threshold:.3f}"),
+    ]
+    for column, (label, value, help_text) in zip(metric_columns, values):
+        with column:
+            metric_card(label, "N/A" if value is None else f"{float(value):.3f}", help_text=help_text)
+    prevalence = baseline.get("test_positive_prevalence")
+    if prevalence is not None:
+        st.caption(f"Test positive prevalence: {float(prevalence):.1%}. Interpret PR-AUC relative to this baseline.")
+
+    comparison = load_comparison()
+    section_title(
+        "Candidate model comparison",
+        "Models are ranked by expanding-window cross-validation PR-AUC; the final test set is not used for selection.",
     )
     if not comparison.empty:
-        show_cols = [
-            "model", "cv_pr_auc", "pr_auc", "roc_auc",
-            "precision", "recall", "f1",
-        ]
-        available = [c for c in show_cols if c in comparison.columns]
-        st.dataframe(
-            comparison[available].round(4),
-            use_container_width=True,
-            hide_index=True,
-        )
+        show = [c for c in ["model", "cv_pr_auc", "selected", "best_params"] if c in comparison.columns]
+        st.dataframe(comparison[show], use_container_width=True, hide_index=True)
 
     section_title(
         "Highest-risk customers",
-        f"Latest snapshot ranked by predicted probability of no delivered purchase in the next 90 days. Default intervention threshold: {threshold:.0%}.",
+        "Latest historical snapshot ranked by probability of no delivered purchase in the next 90 days.",
     )
     display_cols = [
-        "customer_unique_id",
-        "churn_probability",
-        "orders_180d",
-        "revenue_180d",
-        "recency_days",
-        "avg_review_score_180d",
-        "avg_delivery_delay_180d",
+        "customer_unique_id", "churn_probability", "orders_180d", "revenue_180d",
+        "recency_days", "avg_review_score_180d", "avg_delivery_delay_180d",
     ]
-    display = high_risk.sort_values("churn_probability", ascending=False)
-    shown = display[[c for c in display_cols if c in display.columns]].head(100).copy()
+    shown = high_risk.sort_values("churn_probability", ascending=False)[
+        [c for c in display_cols if c in high_risk.columns]
+    ].head(100).copy()
     if not shown.empty:
         shown["churn_probability"] = shown["churn_probability"].map(lambda x: f"{x:.1%}")
     st.dataframe(shown, use_container_width=True, hide_index=True)
 
-    section_title("Risk threshold", "Adjust the intervention threshold without retraining the model.")
-    threshold_view = st.slider(
-        "Probability threshold",
-        min_value=0.50,
-        max_value=0.95,
-        value=float(max(0.50, min(0.95, threshold))),
-        step=0.05,
+    section_title(
+        "Intervention threshold",
+        "Default threshold maximizes F1 on the separate validation period. Changing this control only changes the displayed customer count.",
     )
-    above = latest[latest["churn_probability"] >= threshold_view]
-    metric_card("Customers above selected threshold", f"{len(above):,}", accent="rose")
+    threshold_view = st.slider(
+        "Probability threshold", min_value=0.01, max_value=0.99,
+        value=float(max(0.01, min(0.99, threshold))), step=0.01,
+    )
+    count = int((latest["churn_probability"] >= threshold_view).sum())
+    metric_card("Customers above selected threshold", f"{count:,}", help_text=f"Threshold {threshold_view:.1%}")
 
-    with st.expander("Model methodology"):
+    with st.expander("Evaluation and methodology"):
+        st.write(metadata.get("target_definition", ""))
+        st.write(metadata.get("evaluation_design", ""))
         st.write(
-            "The model uses leakage-safe features calculated strictly before each snapshot. "
-            "The target is 1 when the customer makes no delivered purchase during the following 90 days. "
-            "The final test period is chronologically after the training period. Three models are tuned: "
-            "Logistic Regression, Random Forest, and HistGradientBoosting. Hyperparameters are selected on "
-            "temporal cross-validation using PR-AUC because churn is an imbalanced classification problem."
+            "F1-based threshold selection is a technical proxy, not a business-optimal "
+            "retention policy until intervention costs and customer value are specified."
         )
         st.json({
+            "model_version": metadata.get("model_version"),
             "selected_model": metadata.get("selected_model"),
             "threshold": metadata.get("threshold"),
-            "features": metadata.get("feature_columns", []),
-            "test_metrics": metadata.get("test_metrics", {}),
+            "periods": metadata.get("periods", {}),
+            "class_distribution": metadata.get("class_distribution", {}),
+            "test_metrics": test,
+            "dummy_baseline": baseline,
             "best_params": metadata.get("best_params", {}),
+            "features": metadata.get("feature_columns", []),
         })
