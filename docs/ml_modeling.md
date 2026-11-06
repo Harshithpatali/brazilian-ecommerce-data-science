@@ -1,30 +1,50 @@
-# Churn Modeling
+# Churn Model Training and Evaluation
 
 ## Problem
-Predict whether an active customer at a monthly snapshot will make **no delivered purchase during the following 90 days**.
 
-## Leakage control
-Features are calculated only from purchases before the snapshot date. The latest chronological snapshots are held out as the final test set.
+Predict whether an eligible customer will have no eventually-delivered order
+placed during the 90 days after a monthly point-in-time snapshot.
 
-## Feature engineering
-Derived features include recent-order share, recent-revenue share, order/revenue velocity, product/seller diversity per order, missingness indicators, and log transforms for skewed behavioral variables.
+## Candidate models
 
-## Models
-Three model families are compared:
+1. Logistic Regression — interpretable linear baseline with balanced class weights.
+2. HistGradientBoosting — nonlinear boosted-tree model for tabular data.
 
-1. Logistic Regression — interpretable linear baseline.
-2. Random Forest — nonlinear bagged tree ensemble.
-3. HistGradientBoosting — boosted tree model suited to tabular numeric data.
+The current implementation compares these two models. Random Forest is not
+part of the training code.
 
-## Tuning
-Randomized hyperparameter search is performed with expanding-window temporal cross-validation. The primary optimization metric is **PR-AUC**, with ROC-AUC and F1 reported as secondary metrics.
+## Training and selection
 
-## Saved artifacts
-After `python -m scripts.run_ml`:
+- Unique snapshot dates remain intact when constructing temporal folds.
+- Expanding-window cross-validation is run on the training period with a 90-day
+  purge between each fold's training and validation dates.
+- GridSearchCV optimizes average precision (PR-AUC).
+- The winning model and hyperparameters are selected using CV PR-AUC only.
+  Final holdout metrics are never used to choose a candidate.
 
-- `models/best_churn_model.joblib` — selected fitted pipeline.
-- `models/model_comparison.csv` — model benchmark.
-- `models/model_metadata.json` — features, hyperparameters, split dates and test metrics.
-- `models/test_predictions.parquet` — final chronological test predictions.
+## Validation and final holdout
 
-The Streamlit app loads the saved best model directly. No FastAPI service is required.
+Unique dates are separated chronologically into train, validation, and final
+test periods. A 90-day embargo is applied between each period because the
+target looks 90 days into the future. Snapshots whose outcome windows overlap
+the next period are excluded from the earlier partition.
+
+- Validation selects a classification threshold by maximum F1.
+- The final test period is evaluated once after the model and threshold are frozen.
+- The selected model is compared with a DummyClassifier prior-probability baseline.
+- The F1 threshold is not business-optimal without an intervention cost model.
+
+## Outputs
+
+Running python -m scripts.run_ml writes:
+- models/best_churn_model.joblib — selected fitted pipeline;
+- models/model_comparison.csv — CV PR-AUC and candidate hyperparameters;
+- models/model_metadata.json — version, periods, threshold, distributions,
+  baseline, and final test metrics;
+- models/test_predictions.parquet — final test predictions;
+- models/test_classification_report.json — class-level report;
+- models/test_confusion_matrix.json — confusion matrix;
+- models/test_precision_recall_curve.csv — test precision-recall curve.
+
+The dashboard refuses to serve older artifacts until metadata confirms the
+corrected pipeline version has been trained.

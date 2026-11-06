@@ -3,14 +3,33 @@
 !.env.example
 
 __pycache__/
-*.pyc
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 
 .venv/
 venv/
+ENV/
 
 mlruns/
 *.log
-
 .DS_Store
 
 .streamlit/secrets.toml
+
+# Raw/intermediate source data and local exports must not be committed.
+data/raw/
+data/interim/
+data/processed/
+data/local/
+*.duckdb
+*.sqlite
+
+# Reproducible local evaluation outputs that are not needed by the deployed app.
+models/test_predictions.parquet
+models/test_classification_report.json
+models/*.tmp
+
+# test_confusion_matrix.json and test_precision_recall_curve.csv are intentional
+# dashboard evaluation assets. Keep them trackable so they can be deployed.

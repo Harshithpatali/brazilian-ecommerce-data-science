@@ -100,7 +100,7 @@ The guiding principle throughout the project is **SQL does the heavy lifting, Py
 
 <div align="center">
 
-| 🗄️ 16 | 🧮 20+ | 🤖 3 | 📊 7 | 📈 90-day |
+| 🗄️ 16 | 🧮 20+ | 🤖 2 | 📊 7 | 📈 90-day |
 |:---:|:---:|:---:|:---:|:---:|
 | SQL build stages | analytical tables/views | ML model families compared | live dashboard pages | churn prediction horizon |
 
@@ -111,6 +111,7 @@ The guiding principle throughout the project is **SQL does the heavy lifting, Py
 - ✅ **Experiment-tracked** — every model run logged and comparable in MLflow
 - ✅ **Reproducible from scratch** — one command (`python -m scripts.build_all`) rebuilds the entire analytical layer
 - ✅ **Shipped, not just notebooked** — deployed as a live, public Streamlit application
+- ✅ **Evaluation discipline** — date-grouped temporal CV selects models, a separate validation period selects the threshold, and the final holdout is evaluated once
 
 ## 🏗️ Architecture
 
@@ -247,34 +248,32 @@ Every script is designed to be **rerunnable against a live database** without ma
 ### Methodology highlights
 
 - **Grain:** one row per customer-month prediction snapshot.
-- **Population:** customers who have reached their second delivered order.
-- **Snapshot logic:** monthly snapshots from the customer's second-order month through either their first observed 90-day churn event or the global observation cutoff (whichever comes first). Months with no purchase are retained so the model sees realistic inactivity gaps.
-- **Target:** `churned = 1` when the customer has no delivered purchase in the following 90 days.
-- **Leakage control:** every feature is computed strictly from activity observed **on or before** the snapshot month; only snapshots with a complete 90-day future observation window are kept; the final chronological period is held out as a true out-of-time test set.
+- **Population:** customers who have reached their second delivered order and have at least one order purchased and delivered in the prior 180 days.
+- **Snapshot logic:** monthly snapshots begin after the customer's second delivered order. A snapshot is included only when the full 90-day forward observation window is present. All eligible snapshots remain in the dataset, allowing customers to reactivate after a period of inactivity.
+- **Target:** `churned = 1` when no eventually-delivered order has a purchase timestamp in the half-open interval `[snapshot_date, snapshot_date + 90 days)`. A purchase exactly at the 90-day boundary is outside the window.
+- **Leakage control:** historical orders must be purchased and delivered before the snapshot; review scores are included only when the review was created before the snapshot. Future orders are used only to create the target. Snapshots without a complete 90-day future window are excluded.
 - **Features:** 30/90/180-day rolling order counts and revenue, average order value, average review score, average delivery delay, active months, recency, recent order/revenue share, orders per active month, revenue per order, and recent-vs-older order ratio.
 
 ### Model comparison
 
-Three model families are trained and compared with **expanding-window temporal cross-validation** and randomized hyperparameter search, optimizing primarily for **PR-AUC** (with ROC-AUC and F1 as secondary metrics):
+Two model families are tuned with **expanding-window temporal cross-validation grouped by unique snapshot dates**, a 90-day embargo between fold periods, and GridSearchCV, optimizing average precision (PR-AUC):
 
 | # | Model | Type | Why it's included |
 |---|---|---|---|
 | 1 | **Logistic Regression** | Linear baseline | Interpretable coefficients, fast, strong sanity-check baseline |
-| 2 | **Random Forest** | Bagged tree ensemble | Captures nonlinearity and interactions with low tuning effort |
-| 3 | **HistGradientBoosting** | Boosted trees | Typically strongest performer on tabular, mixed-scale numeric data |
+| 2 | **HistGradientBoosting** | Boosted trees | Captures nonlinear relationships in tabular data |
 
 ```mermaid
 flowchart LR
     A["Point-in-time<br/>churn dataset"] --> B["Chronological split<br/>train / validation / test"]
-    B --> C["Randomized hyperparameter search<br/>+ expanding-window CV"]
+    B --> C["Date-grouped expanding-window CV<br/>+ GridSearchCV"]
     C --> D1[Logistic Regression]
-    C --> D2[Random Forest]
     C --> D3[HistGradientBoosting]
-    D1 --> E["Compare on PR-AUC<br/>(+ ROC-AUC, F1)"]
-    D2 --> E
+    D1 --> E["Select using mean CV PR-AUC"]
     D3 --> E
-    E --> F["Select best pipeline"]
-    F --> G[("models/best_churn_model.joblib")]
+    E --> V["Choose threshold on validation<br/>by maximum F1"]
+    V --> T["Evaluate frozen model once<br/>on final chronological test"]
+    T --> G[("models/best_churn_model.joblib")]
     C -.logged to.-> M[("MLflow<br/>Tracking Server")]
 
     style A fill:#4c72b0,color:#fff
@@ -284,9 +283,11 @@ flowchart LR
 
 The performance-optimized build first materializes delivered orders into a compact `ml.delivered_orders` table, aggregates to `ml.customer_monthly_activity`, and only then constructs the point-in-time dataset — avoiding an expensive snapshot × full-order-history join and reducing the risk of Supabase statement timeouts on large SQL builds.
 
-All experiment runs, hyperparameters, and metrics are tracked with **MLflow**. The selected best pipeline is persisted to `models/best_churn_model.joblib` and loaded directly by Streamlit — no separate model-serving API is required.
+Temporal-CV runs, hyperparameters and final selected-model evaluation are tracked with **MLflow**. The selected pipeline is persisted to `models/best_churn_model.joblib` and loaded directly by Streamlit — no separate model-serving API is required. Model selection uses cross-validation PR-AUC; validation selects the F1 threshold; the final test period is evaluated once. A 90-day purge prevents training/validation label windows from overlapping the next period.
 
 See [`docs/churn_methodology.md`](docs/churn_methodology.md), [`docs/ml_modeling.md`](docs/ml_modeling.md), and [`docs/model_card.md`](docs/model_card.md) for full details, including known limitations.
+
+> The model artifacts currently committed to the repository predate the corrected `churn-pit-v2` pipeline. The Churn page remains disabled until the PostgreSQL dataset is rebuilt and the corrected model artifacts are generated with `python -m scripts.run_ml`.
 
 ## 📊 Statistical Analysis
 
@@ -330,8 +331,8 @@ brazilian-ecommerce-data-science/
 │   └── visualization/         # chart helpers
 ├── scripts/                  # CLI entry points (see below)
 ├── docs/                     # data model, methodology, business questions, model card
-├── data/                     # generated dashboard + ML datasets (gitignored)
-├── models/                   # trained model artifacts (gitignored)
+├── data/                     # historical dashboard/scoring datasets used by the deployed demo
+├── models/                   # deployed model, metadata and model-selection artifacts
 ├── mlflow/                   # local MLflow tracking store
 ├── tests/                    # pytest suite
 └── requirements.txt
@@ -433,6 +434,9 @@ This builds `data/ml/customer_churn_dataset.parquet`, trains and compares the ca
 - `models/model_comparison.csv` — benchmark across model families
 - `models/model_metadata.json` — features, hyperparameters, split dates, test metrics
 - `models/test_predictions.parquet` — final chronological test predictions
+- `models/test_classification_report.json` — thresholded class-level metrics
+- `models/test_confusion_matrix.json` — final holdout confusion matrix
+- `models/test_precision_recall_curve.csv` — final holdout precision-recall curve
 
 ### 8. (Optional) Explore experiments in MLflow
 
@@ -472,11 +476,11 @@ The churn dataset is materialized in PostgreSQL using a compact customer-month t
 pytest
 ```
 
-The test suite covers the database connection module and the churn feature-engineering contract (schema/shape guarantees the SQL layer must satisfy before modeling).
+The test suite includes connection and feature-contract checks, target-boundary tests, SQL target-contract checks, and date-grouped temporal split tests. Database-level integrity checks are run against the configured PostgreSQL instance.
 
 ## 🔒 Security
 
-`.env`, local database credentials, and generated model/data artifacts are excluded from version control via `.gitignore`. Use `.env.example` as the safe, credential-free template.
+`.env`, credentials, raw source exports, local/intermediate data and reproducible test outputs are excluded via `.gitignore`. The small historical dashboard/scoring datasets and fitted model artifacts are intentionally tracked as Streamlit deployment assets.
 
 ## 🎯 What This Project Demonstrates
 
@@ -486,7 +490,7 @@ The test suite covers the database connection module and the churn feature-engin
 - Customer segmentation (RFM) and cohort retention analysis
 - Rigorous statistical hypothesis testing
 - Leakage-safe, point-in-time feature engineering for time-aware ML
-- Model comparison with temporal cross-validation and experiment tracking (MLflow)
+- Model comparison using date-grouped temporal cross-validation, untouched final holdout evaluation, a prior-probability baseline, and MLflow tracking
 - Production-style project structure: reproducible SQL builds, CLI scripts, tests, docs
 - End-to-end delivery as a live, interactive business dashboard (Streamlit)
 
