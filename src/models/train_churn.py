@@ -44,8 +44,8 @@ def _dates(values: pd.Series | list[Any]) -> pd.Series:
 
 def chronological_partition_indices(
     snapshot_dates: pd.Series | list[Any],
-    test_fraction: float = 0.20,
-    validation_start_fraction: float = 0.45,
+    test_fraction: float = 0.15,
+    validation_start_fraction: float = 0.65,
     horizon_days: int = 90,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, dict[str, str]]:
     """
@@ -191,25 +191,56 @@ def make_date_grouped_splits(
         "or use a longer observation history."
     )
 
+def repeat_purchase_average_precision_scorer(
+    estimator: Any, X: pd.DataFrame, y_churned: pd.Series | np.ndarray
+) -> float:
+    """
+    Score the minority event: a delivered purchase within 90 days.
+
+    The estimator is fitted to churned=1, so its class-1 probability is
+    converted to P(repeat purchase) = 1 - P(churn).
+    """
+    churn_probability = estimator.predict_proba(X)[:, 1]
+    repeat_probability = 1.0 - churn_probability
+    repeat_target = 1 - np.asarray(y_churned, dtype=int)
+    return float(average_precision_score(repeat_target, repeat_probability))
+
+
 def choose_f1_threshold(
-    y_true: pd.Series | np.ndarray, probabilities: np.ndarray
+    y_churned: pd.Series | np.ndarray,
+    churn_probabilities: np.ndarray,
 ) -> tuple[float, dict[str, float]]:
-    """Choose a threshold on validation data only."""
-    precision, recall, thresholds = precision_recall_curve(y_true, probabilities)
+    """
+    Choose the threshold on validation data by maximizing F1 for repeat purchase.
+
+    Returns the equivalent churn-probability cutoff for dashboard risk scoring.
+    """
+    repeat_target = 1 - np.asarray(y_churned, dtype=int)
+    repeat_probabilities = 1.0 - np.asarray(churn_probabilities, dtype=float)
+    precision, recall, thresholds = precision_recall_curve(
+        repeat_target, repeat_probabilities
+    )
     if not len(thresholds):
-        threshold = 0.5
+        repeat_threshold = 0.5
     else:
-        denom = precision[:-1] + recall[:-1]
+        denominator = precision[:-1] + recall[:-1]
         f1_values = np.divide(
-            2 * precision[:-1] * recall[:-1], denom,
-            out=np.zeros_like(denom), where=denom > 0,
+            2 * precision[:-1] * recall[:-1],
+            denominator,
+            out=np.zeros_like(denominator),
+            where=denominator > 0,
         )
-        threshold = float(thresholds[int(np.nanargmax(f1_values))])
-    predicted = (probabilities >= threshold).astype(int)
-    return threshold, {
-        "precision": float(precision_score(y_true, predicted, zero_division=0)),
-        "recall": float(recall_score(y_true, predicted, zero_division=0)),
-        "f1": float(f1_score(y_true, predicted, zero_division=0)),
+        repeat_threshold = float(thresholds[int(np.nanargmax(f1_values))])
+
+    predicted_repeat = (repeat_probabilities >= repeat_threshold).astype(int)
+    # Translate the repeat-purchase threshold to a churn-probability threshold.
+    # nextafter preserves the complementary decision at exact ties.
+    churn_threshold = float(np.nextafter(1.0 - repeat_threshold, np.inf))
+    return churn_threshold, {
+        "precision": float(precision_score(repeat_target, predicted_repeat, zero_division=0)),
+        "recall": float(recall_score(repeat_target, predicted_repeat, zero_division=0)),
+        "f1": float(f1_score(repeat_target, predicted_repeat, zero_division=0)),
+        "repeat_purchase_probability_threshold": repeat_threshold,
     }
 
 
@@ -307,7 +338,7 @@ def main() -> None:
     for name, (pipeline, grid) in build_models().items():
         with mlflow.start_run(run_name=f"cv_tuned_{name}"):
             search = GridSearchCV(
-                pipeline, grid, scoring="average_precision", cv=folds,
+                pipeline, grid, scoring=repeat_purchase_average_precision_scorer, cv=folds,
                 n_jobs=-1, refit=True, error_score="raise",
             )
             search.fit(X_train, y_train)
@@ -316,20 +347,20 @@ def main() -> None:
                 "model_family": name,
                 "cv": "expanding_window_grouped_by_snapshot_date",
                 "cv_folds": len(folds),
-                "selection_metric": "cv_average_precision",
+                "selection_metric": "cv_average_precision_for_purchase_within_90_days",
                 "model_version": MODEL_VERSION,
             })
             mlflow.log_params({key: str(value) for key, value in search.best_params_.items()})
-            mlflow.log_metric("cv_pr_auc", float(search.best_score_))
+            mlflow.log_metric("cv_repeat_purchase_pr_auc", float(search.best_score_))
             rows.append({
                 "model": name,
-                "cv_pr_auc": float(search.best_score_),
+                "cv_repeat_purchase_pr_auc": float(search.best_score_),
                 "best_params": json.dumps(search.best_params_, sort_keys=True),
             })
 
     # The winning candidate is selected only by temporal CV, never by test metrics.
     comparison = pd.DataFrame(rows).sort_values(
-        ["cv_pr_auc", "model"], ascending=[False, True]
+        ["cv_repeat_purchase_pr_auc", "model"], ascending=[False, True]
     ).reset_index(drop=True)
     selected_name = str(comparison.iloc[0]["model"])
     selected_search = searches[selected_name]
@@ -341,25 +372,36 @@ def main() -> None:
         y_validation, validation_prob
     )
     test_prob = selected_model.predict_proba(X_test)[:, 1]
-    test_pred = (test_prob >= threshold).astype(int)
+    test_repeat_prob = 1.0 - test_prob
+    y_test_repeat = 1 - y_test.to_numpy(dtype=int)
+    repeat_threshold = float(
+        validation_threshold_metrics["repeat_purchase_probability_threshold"]
+    )
+    test_pred_repeat = (test_repeat_prob >= repeat_threshold).astype(int)
+    test_pred = 1 - test_pred_repeat
 
     test_metrics = {
-        "roc_auc": float(roc_auc_score(y_test, test_prob)),
-        "pr_auc": float(average_precision_score(y_test, test_prob)),
-        "precision": float(precision_score(y_test, test_pred, zero_division=0)),
-        "recall": float(recall_score(y_test, test_pred, zero_division=0)),
-        "f1": float(f1_score(y_test, test_pred, zero_division=0)),
+        # PR-AUC/ROC-AUC now measure the minority repeat-purchase event.
+        "roc_auc": float(roc_auc_score(y_test_repeat, test_repeat_prob)),
+        "pr_auc": float(average_precision_score(y_test_repeat, test_repeat_prob)),
+        "precision": float(precision_score(y_test_repeat, test_pred_repeat, zero_division=0)),
+        "recall": float(recall_score(y_test_repeat, test_pred_repeat, zero_division=0)),
+        "f1": float(f1_score(y_test_repeat, test_pred_repeat, zero_division=0)),
         "class_0_precision": float(precision_score(y_test, test_pred, pos_label=0, zero_division=0)),
         "class_0_recall": float(recall_score(y_test, test_pred, pos_label=0, zero_division=0)),
         "class_0_f1": float(f1_score(y_test, test_pred, pos_label=0, zero_division=0)),
+        "class_1_precision": float(precision_score(y_test, test_pred, pos_label=1, zero_division=0)),
+        "class_1_recall": float(recall_score(y_test, test_pred, pos_label=1, zero_division=0)),
+        "class_1_f1": float(f1_score(y_test, test_pred, pos_label=1, zero_division=0)),
         "balanced_accuracy": float(balanced_accuracy_score(y_test, test_pred)),
-        "matthews_corrcoef": float(matthews_corrcoef(y_test, test_pred)),
-        "positive_prevalence": float(y_test.mean()),
+        "matthews_corrcoef": float(matthews_corrcoef(y_test_repeat, test_pred_repeat)),
+        "positive_prevalence": float(y_test_repeat.mean()),
         "threshold": float(threshold),
     }
     dummy = DummyClassifier(strategy="prior").fit(X_train, y_train)
-    dummy_prob = dummy.predict_proba(X_test)[:, 1]
-    dummy_pr_auc = float(average_precision_score(y_test, dummy_prob))
+    dummy_churn_prob = dummy.predict_proba(X_test)[:, 1]
+    dummy_repeat_prob = 1.0 - dummy_churn_prob
+    dummy_pr_auc = float(average_precision_score(y_test_repeat, dummy_repeat_prob))
     test_metrics["dummy_baseline_pr_auc"] = dummy_pr_auc
     test_metrics["pr_auc_lift_over_dummy"] = float(test_metrics["pr_auc"] - dummy_pr_auc)
 
@@ -368,12 +410,13 @@ def main() -> None:
         "snapshot_date": df.iloc[test_idx]["snapshot_date"].to_numpy(),
         "actual_churned": y_test.to_numpy(),
         "churn_probability": test_prob,
+        "repeat_purchase_probability": test_repeat_prob,
         "predicted_churned": test_pred,
         "threshold": threshold,
     })
     predictions.to_parquet(MODEL_DIR / "test_predictions.parquet", index=False)
 
-    precision, recall, pr_thresholds = precision_recall_curve(y_test, test_prob)
+    precision, recall, pr_thresholds = precision_recall_curve(y_test_repeat, test_repeat_prob)
     pd.DataFrame({
         "precision": precision[:-1], "recall": recall[:-1], "threshold": pr_thresholds
     }).to_csv(MODEL_DIR / "test_precision_recall_curve.csv", index=False)
@@ -405,10 +448,12 @@ def main() -> None:
         "experiment_name": experiment,
         "tracking_uri": get_tracking_uri(),
         "selected_model": selected_name,
-        "selection_metric": "cv_pr_auc",
+        "selection_metric": "cv_average_precision_for_purchase_within_90_days",
         "best_params": selected_search.best_params_,
         "threshold": threshold,
-        "threshold_selection": "maximum F1 on separate validation period",
+        "threshold_selection": "maximum F1 for purchase_within_90_days on separate validation period",
+        "repeat_purchase_probability_threshold": repeat_threshold,
+        "evaluation_positive_class": "purchase_within_90_days (SQL churned=0)",
         "threshold_validation_metrics": validation_threshold_metrics,
         "target_definition": (
             "1 when no eventually-delivered order has a purchase timestamp in "
@@ -462,10 +507,10 @@ def main() -> None:
     with mlflow.start_run(run_name="final_selected_model_holdout"):
         mlflow.log_params({
             "selected_model": selected_name,
-            "selection_metric": "cv_pr_auc",
+            "selection_metric": "cv_average_precision_for_purchase_within_90_days",
             "model_version": MODEL_VERSION,
             "threshold": threshold,
-            "threshold_selection": "maximum validation F1",
+            "threshold_selection": "maximum validation F1 for purchase_within_90_days",
             "test_start": periods["test_start"],
             "test_end": periods["test_end"],
         })
@@ -474,7 +519,7 @@ def main() -> None:
             for key, value in test_metrics.items()
             if isinstance(value, (float, int)) and np.isfinite(value)
         })
-        mlflow.log_metric("validation_threshold_f1", validation_threshold_metrics["f1"])
+        mlflow.log_metric("validation_repeat_purchase_f1", validation_threshold_metrics["f1"])
         for artifact, folder in [
             (comparison_path, "model_selection"),
             (metadata_path, "model_selection"),
@@ -488,14 +533,15 @@ def main() -> None:
             selected_model, artifact_path="best_churn_model", input_example=X_train.head(3)
         )
 
-    print("Target distribution (1 = churned):")
+    print("Target distribution (1 = no delivered purchase; 0 = purchase within 90 days):")
     print(y.value_counts(normalize=True).sort_index().to_string())
     print("Periods:", json.dumps(periods, indent=2))
-    print("CV model comparison:")
+    print("CV model comparison (PR-AUC for purchase within 90 days):")
     print(comparison.to_string(index=False))
     print("Selected model:", selected_name)
-    print("Validation-selected threshold:", threshold)
-    print("Final untouched test metrics:", json.dumps(test_metrics, indent=2))
+    print("Validation-selected churn probability threshold:", threshold)
+    print("Validation-selected repeat-purchase probability threshold:", repeat_threshold)
+    print("Final untouched test metrics (positive class = purchase within 90 days):", json.dumps(test_metrics, indent=2))
 
 
 if __name__ == "__main__":
