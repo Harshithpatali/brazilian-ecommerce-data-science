@@ -27,6 +27,12 @@ _REQUIRED_METRICS = (
     "threshold",
     "dummy_baseline_pr_auc",
     "pr_auc_lift_over_dummy",
+    "brier_score",
+    "log_loss",
+    "expected_calibration_error",
+    "recency_baseline_pr_auc",
+    "frequency_baseline_pr_auc",
+    "lifetime_frequency_baseline_pr_auc",
 )
 
 
@@ -46,11 +52,31 @@ def validate_model_metadata(metadata: dict[str, Any]) -> list[str]:
     if metadata.get("feature_columns") != FEATURE_COLS:
         errors.append("feature_columns do not match the application's feature contract.")
 
-    if metadata.get("evaluation_positive_class") != "purchase_within_90_days (SQL churned=0)":
-        errors.append("evaluation_positive_class must identify repeat purchase (SQL churned=0).")
+    expected_cohort = (
+        "Eligible after at least one delivered order; predict the second delivered "
+        "purchase within the next 90 days."
+    )
+    if metadata.get("cohort_definition") != expected_cohort:
+        errors.append("cohort_definition must describe first-order customers and second-purchase prediction.")
 
-    if metadata.get("threshold_selection") != "maximum F2 for purchase_within_90_days on separate validation period":
-        errors.append("threshold_selection must use validation F2 for repeat purchase.")
+    if metadata.get("evaluation_positive_class") != "second_purchase_within_90_days (SQL churned=0)":
+        errors.append("evaluation_positive_class must identify second purchase within 90 days.")
+
+    if metadata.get("threshold_selection") != "maximum F2 for second_purchase_within_90_days on separate validation period":
+        errors.append("threshold_selection must use validation F2 for second-purchase propensity.")
+
+    calibration = metadata.get("calibration")
+    if not isinstance(calibration, dict):
+        errors.append("calibration metadata is missing.")
+    else:
+        if calibration.get("method") != "Platt sigmoid":
+            errors.append("calibration.method must identify Platt sigmoid calibration.")
+        if calibration.get("fit_source") != "purged out-of-fold predictions from training partition only":
+            errors.append("calibration must be fit on purged out-of-fold training predictions.")
+        for name in ("slope", "intercept"):
+            value = calibration.get(name)
+            if not isinstance(value, (int, float)) or not isfinite(float(value)):
+                errors.append(f"calibration.{name} must be finite.")
     threshold_beta = metadata.get("threshold_beta")
     if not isinstance(threshold_beta, (int, float)) or float(threshold_beta) != 2.0:
         errors.append("threshold_beta must be 2.0 for recall-oriented F2 selection.")
@@ -108,13 +134,19 @@ def validate_model_metadata(metadata: dict[str, Any]) -> list[str]:
             "class_0_precision", "class_0_recall", "class_0_f1",
             "class_1_precision", "class_1_recall", "class_1_f1",
             "balanced_accuracy", "positive_prevalence", "threshold",
-            "dummy_baseline_pr_auc",
+            "dummy_baseline_pr_auc", "brier_score", "expected_calibration_error",
+            "recency_baseline_pr_auc", "frequency_baseline_pr_auc",
+            "lifetime_frequency_baseline_pr_auc",
         )
         for name in bounded_metrics:
             value = metrics.get(name)
             if isinstance(value, (int, float)) and isfinite(float(value)):
                 if not 0 <= float(value) <= 1:
                     errors.append(f"test_metrics.{name} must be between 0 and 1.")
+        log_loss_value = metrics.get("log_loss")
+        if isinstance(log_loss_value, (int, float)) and isfinite(float(log_loss_value)):
+            if float(log_loss_value) < 0:
+                errors.append("test_metrics.log_loss cannot be negative.")
         metric_threshold = metrics.get("threshold")
         mcc = metrics.get("matthews_corrcoef")
         if isinstance(mcc, (int, float)) and isfinite(float(mcc)):
@@ -175,6 +207,45 @@ def validate_model_metadata(metadata: dict[str, Any]) -> list[str]:
                     errors.append(
                         f"class_distribution.{partition}.{label} must be a positive integer."
                     )
+
+    capacity_metrics = metadata.get("test_capacity_metrics")
+    if not isinstance(capacity_metrics, dict):
+        errors.append("test_capacity_metrics is missing or is not an object.")
+    else:
+        for capacity in ("5%", "10%", "20%"):
+            values = capacity_metrics.get(capacity)
+            if not isinstance(values, dict):
+                errors.append(f"test_capacity_metrics.{capacity} is missing.")
+                continue
+            for metric_name in ("precision", "recall", "lift_over_monthly_prevalence"):
+                value = values.get(metric_name)
+                if not isinstance(value, (int, float)) or not isfinite(float(value)):
+                    errors.append(
+                        f"test_capacity_metrics.{capacity}.{metric_name} must be finite."
+                    )
+                elif metric_name != "lift_over_monthly_prevalence" and not 0 <= float(value) <= 1:
+                    errors.append(
+                        f"test_capacity_metrics.{capacity}.{metric_name} must be between 0 and 1."
+                    )
+
+    ci = metadata.get("customer_cluster_bootstrap_pr_auc_ci95")
+    if not isinstance(ci, dict):
+        errors.append("customer_cluster_bootstrap_pr_auc_ci95 is missing.")
+    else:
+        lower, upper = ci.get("lower_95"), ci.get("upper_95")
+        if not all(isinstance(v, (int, float)) and isfinite(float(v)) for v in (lower, upper)):
+            errors.append("Customer-clustered PR-AUC confidence interval must be finite.")
+        elif not 0 <= float(lower) <= float(upper) <= 1:
+            errors.append("Customer-clustered PR-AUC confidence interval is invalid.")
+
+    unseen = metadata.get("unseen_customer_test_metrics")
+    if not isinstance(unseen, dict):
+        errors.append("unseen_customer_test_metrics is missing.")
+    else:
+        for name in ("rows", "customers"):
+            value = unseen.get(name)
+            if not isinstance(value, int) or value < 0:
+                errors.append(f"unseen_customer_test_metrics.{name} must be a non-negative integer.")
 
     periods = metadata.get("periods")
     if not isinstance(periods, dict):
