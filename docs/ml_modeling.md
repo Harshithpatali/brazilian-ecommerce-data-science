@@ -48,6 +48,20 @@ mistaken for the second-purchase training population.
 - Prior-probability, recency-only, recent-order-frequency-only and
   lifetime-order-frequency-only baselines are scored on the same final holdout.
 
+## First-order customer and transaction signals
+
+The 49-feature contract supplements purchase-frequency history with
+first-order basket gross value, item/product/category/seller counts, freight
+share, payment type and installments, approval lag, delivery duration and
+delay, and the first-order review score. The rolling 180-day window also
+summarizes basket size, category/seller diversity, payment installments,
+credit-card share and freight share.
+
+First-order reviews are used only after their
+review_answer_timestamp precedes snapshot_date; rolling features join
+delivered orders only when purchase and delivery timestamps precede the
+snapshot.
+
 ## Probability calibration
 
 A Platt sigmoid is fitted from purged out-of-fold training predictions only.
