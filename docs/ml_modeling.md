@@ -1,65 +1,65 @@
-# Churn Model Training and Evaluation
+# Repeat-Purchase Propensity — Training and Evaluation
 
 ## Problem
 
-Predict whether an eligible customer will have no eventually-delivered order
-placed during the 90 days after a monthly point-in-time snapshot.
+At each monthly customer snapshot, rank active customers by the probability of an eventually-delivered purchase in the following 90 days. Eligible customers have at least one delivered order in the exact prior 180-day window and have reached their first delivered order.
+
+The SQL label is \`churned\`: class 1 means no delivered purchase in the next 90 days; class 0 means a delivered purchase. Model scoring and ranking use \`1 - churned\` as the positive repeat-purchase event.
+
+## Feature contract
+
+There are 29 features: 27 numeric features and two categorical fields (\`customer_state\`, \`snapshot_month\`). Customer state is taken from the most recent delivered order observable before the snapshot. Snapshot month is derived from the snapshot date. Historical order, delivery and review timestamps must precede the snapshot.
 
 ## Candidate models
 
-1. Logistic Regression — interpretable linear baseline with balanced class weights.
-2. HistGradientBoosting — nonlinear boosted-tree model for tabular data.
-3. Random Forest — class-balanced, shallow/regularized bagged-tree candidate.
+1. Logistic Regression — interpretable linear baseline.
+2. HistGradientBoosting — nonlinear tabular benchmark.
+3. Random Forest — bagged-tree benchmark.
+4. CatBoost — gradient boosting with native categorical support for state and month.
 
-The current implementation compares all three candidates.
+Numeric imputation and one-hot encoding are fitted inside the train-only pipeline for scikit-learn candidates. CatBoost consumes the named categorical columns directly. No resampling or synthetic minority examples are created.
 
-## Class imbalance and scoring objective
+## Selection and calibration
 
-The rebuilt dataset contains 10,570 customer-month snapshots. Only 306 (2.89%)
-have a delivered purchase in the next 90 days; 10,264 (97.11%) do not.
+- Unique snapshot dates are kept together throughout all splits.
+- Train/validation/test partitions are chronological and separated by a 90-day target-window embargo.
+- Expanding-window CV folds are built from unique snapshot dates and purge overlapping target windows.
+- Each CV fit and validation fold must contain at least 15 repeat-purchase and 15 no-purchase examples; otherwise the fold is rejected.
+- GridSearchCV selects the winning candidate by mean average precision for repeat purchase.
+- A Platt sigmoid is fitted only on the separate chronological validation period. The final holdout does not select the candidate, calibration model, or campaign capacity.
 
-The estimator is fitted to the SQL target \`churned\`, where 1 means no delivered
-purchase. To avoid optimizing for this near-constant majority class, temporal
-CV average precision is computed for the minority repeat-purchase event
-(\`1 - churned\`). The model retains its churn-probability output, and
-repeat-purchase probability is its complement.
+## Operational policy
 
-## Training and selection
+The primary operating policy ranks customers separately within each monthly snapshot and selects the top 10% by calibrated repeat-purchase probability. Top-5% and top-20% results are reported as alternative capacity scenarios. This is designed to give a campaign team an explicit contact-volume trade-off; it is not a claim that 10% is the economically optimal level.
 
-- Unique snapshot dates remain intact when constructing temporal folds.
-- Expanding-window cross-validation runs on the training period with a 90-day
-  purge between each fold's training and validation dates.
-- GridSearchCV optimizes average precision for repeat purchase within 90 days.
-- The winning model and hyperparameters are selected using CV PR-AUC only.
-  Final holdout metrics are never used to choose a candidate.
+## Evaluation outputs
 
-## Validation and final holdout
+The holdout report contains:
 
-Unique dates are separated chronologically into train, validation, and final
-test periods. A 90-day embargo is applied between each period because the
-target looks 90 days into the future. Snapshots whose outcome windows overlap
-the next period are excluded from the earlier partition.
+- Repeat-purchase PR-AUC and ROC-AUC.
+- Prior-prevalence and recency-only baseline PR-AUC.
+- Brier score, log loss, Brier skill score and calibration deciles.
+- Precision, recall, F1, F2, balanced accuracy and Matthews correlation.
+- Precision, recall, lift and flagged share at top 5%, 10% and 20% capacity per month.
+- Customer-cluster bootstrap 95% PR-AUC confidence interval (500 resamples).
+- Candidate model comparison, split dates, class counts, confusion matrix and prediction-level scores.
 
-- Validation selects the repeat-purchase probability threshold by maximum F2 (beta=2), deliberately favoring recall. The complementary churn-probability cutoff is stored for risk scoring.
-- The final test period is evaluated once after the model and threshold are frozen.
-- Test PR-AUC, ROC-AUC and F1 focus on the minority repeat-purchase event and
-  are compared with a DummyClassifier prior-probability baseline.
-- Reports also include both classes' precision/recall/F1, balanced accuracy,
-  and Matthews correlation coefficient.
-- The F2 threshold is not business-optimal without an intervention cost model and false-positive costs.
-- The v4 holdout results were PR-AUC 0.0472 vs. prior baseline 0.0242, recall 65.18%, precision 3.62%, and F2 0.1482. The model flagged 43.6% of holdout rows; use a validation-selected precision floor or a known campaign-capacity constraint before operational use.
+The final v5 holdout metrics are intentionally not documented as results until the full database rebuild, validation, training, metadata-contract verification and artifact commit succeed.
 
-## Outputs
+## Artifacts
 
-Running \`python -m scripts.run_ml\` writes:
-- \`models/best_churn_model.joblib\` — selected fitted pipeline;
-- \`models/model_comparison.csv\` — repeat-purchase CV PR-AUC and candidate parameters;
-- \`models/model_metadata.json\` — version, periods, threshold, class distributions,
-  baseline and final test metrics;
-- \`models/test_predictions.parquet\` — final test predictions;
-- \`models/test_classification_report.json\` — class-level report;
-- \`models/test_confusion_matrix.json\` — confusion matrix;
-- \`models/test_precision_recall_curve.csv\` — repeat-purchase precision-recall curve.
+The training run writes:
 
-The dashboard refuses to serve older artifacts until metadata confirms the
-corrected pipeline version has been trained.
+- \`models/best_churn_model.joblib\` — calibrated v5 propensity model.
+- \`models/model_metadata.json\` — feature/target contract, population, calibration, splits, baselines, confidence interval and holdout metrics.
+- \`models/model_comparison.csv\` — purged temporal-CV ranking and candidate parameters.
+- \`models/test_predictions.parquet\` — final holdout probabilities and capacity flags.
+- \`models/test_classification_report.json\` — class-level report.
+- \`models/test_confusion_matrix.json\` — final holdout confusion matrix under top-10% capacity.
+- \`models/test_precision_recall_curve.csv\` — final holdout precision-recall curve.
+- \`models/test_calibration.csv\` — calibration decile table.
+- \`data/ml/customer_churn_dataset.parquet\` — rebuilt customer-month model dataset.
+
+## Production caveat
+
+Offline propensity performance does not establish incremental campaign impact. Before using model scores to contact customers or issue incentives, run a randomized holdout or uplift experiment and evaluate incremental purchases, margin, cost per incremental buyer, ROI and customer-level guardrails. Live deployment additionally requires monitoring for data drift, calibration drift, delayed labels and changing campaign policies.
