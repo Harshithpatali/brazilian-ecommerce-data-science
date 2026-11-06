@@ -3,8 +3,8 @@ POINT-IN-TIME CUSTOMER CHURN DATASET
 
 Target interval: [snapshot_date, snapshot_date + 90 days)
 Features use only orders purchased before the snapshot and delivered to the
-customer before the snapshot. Reviews must also have been created before the
-snapshot. The source observation end uses all source orders.
+customer before the snapshot. Review scores are available only after
+review_answer_timestamp. The source observation end uses all source orders.
 Every eligible monthly snapshot is retained: 90-day churn is not permanent.
 */
 
