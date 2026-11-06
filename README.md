@@ -256,7 +256,7 @@ The v5 cohort corrects an earlier modeling-definition issue: starting after the 
 - **Observation window:** a snapshot is retained only when the complete 90-day forward outcome window is observable.
 - **Reactivation:** all eligible monthly snapshots are retained; a customer can return to the positive class after a previous no-purchase period.
 - **Leakage controls:** purchase and delivery timestamps for predictors must precede the snapshot. Review scores are available only when \`review_answer_timestamp\` precedes the snapshot. Future purchases are used only to construct the label.
-- **Feature set:** 27 point-in-time features covering recent and prior order activity, lifetime order count, tenure, interpurchase timing, simultaneous-order frequency, recency, revenue, delivery and review experience.
+- **Feature set:** 49 point-in-time features: recent and prior purchase activity; lifetime order count, tenure and interpurchase timing; first-order basket value, item/product/category/seller diversity, freight share, payment method and installments; first-order delivery and review experience; and rolling basket/payment behaviour.
 
 ### Data-population audit
 
