@@ -705,6 +705,24 @@ def main() -> None:
         )
         for capacity in (0.05, 0.10, 0.20)
     }
+    baseline_repeat_scores = {
+        "recency_only": -X_test["recency_days"].fillna(
+            X_test["recency_days"].max()
+        ).to_numpy(),
+        "orders_180d_only": X_test["orders_180d"].fillna(0).to_numpy(),
+        "lifetime_frequency_only": X_test[
+            "lifetime_delivered_orders"
+        ].fillna(0).to_numpy(),
+    }
+    baseline_capacity_metrics = {
+        baseline_name: {
+            f"{int(capacity * 100)}%": _monthly_capacity_metrics(
+                y_test_repeat, scores, test_dates, capacity
+            )
+            for capacity in (0.05, 0.10, 0.20)
+        }
+        for baseline_name, scores in baseline_repeat_scores.items()
+    }
     cluster_bootstrap_ci = _cluster_bootstrap_pr_auc_ci(
         y_test_repeat,
         test_repeat_probability,
@@ -770,6 +788,10 @@ def main() -> None:
     capacity_path = MODEL_DIR / "test_capacity_metrics.json"
     capacity_path.write_text(
         json.dumps(capacity_metrics, indent=2), encoding="utf-8"
+    )
+    baseline_capacity_path = MODEL_DIR / "test_baseline_capacity_metrics.json"
+    baseline_capacity_path.write_text(
+        json.dumps(baseline_capacity_metrics, indent=2), encoding="utf-8"
     )
 
     report_path = MODEL_DIR / "test_classification_report.json"
@@ -872,6 +894,7 @@ def main() -> None:
         },
         "test_metrics": test_metrics,
         "test_capacity_metrics": capacity_metrics,
+        "baseline_capacity_metrics": baseline_capacity_metrics,
         "customer_cluster_bootstrap_pr_auc_ci95": cluster_bootstrap_ci,
         "unseen_customer_test_metrics": unseen_metrics,
         "baseline_metrics": {
@@ -894,6 +917,7 @@ def main() -> None:
             "confusion_matrix": "models/test_confusion_matrix.json",
             "precision_recall_curve": "models/test_precision_recall_curve.csv",
             "capacity_metrics": "models/test_capacity_metrics.json",
+            "baseline_capacity_metrics": "models/test_baseline_capacity_metrics.json",
             "calibration_bins": "models/test_calibration_bins.csv",
         },
     }
@@ -933,6 +957,7 @@ def main() -> None:
             (MODEL_DIR / "test_precision_recall_curve.csv", "evaluation"),
             (MODEL_DIR / "test_predictions.parquet", "evaluation"),
             (capacity_path, "evaluation"),
+            (baseline_capacity_path, "evaluation"),
             (calibration_bins_path, "evaluation"),
         ]:
             mlflow.log_artifact(str(artifact), artifact_path=folder)
