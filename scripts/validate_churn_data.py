@@ -192,6 +192,19 @@ def main() -> None:
               OR dataset.avg_items_per_order_180d <= 0
               OR dataset.avg_categories_per_order_180d <= 0
               OR dataset.avg_sellers_per_order_180d <= 0
+              OR dataset.avg_distinct_products_per_order_180d <= 0
+              OR dataset.avg_product_diversity_share_180d <= 0
+              OR dataset.avg_product_diversity_share_180d > 1
+              OR dataset.category_preference_entropy_180d < 0
+              OR dataset.dominant_category_share_180d < 0
+              OR dataset.dominant_category_share_180d > 1
+              OR dataset.seller_concentration_hhi_180d < 0
+              OR dataset.seller_concentration_hhi_180d > 1
+              OR dataset.top_seller_share_180d < 0
+              OR dataset.top_seller_share_180d > 1
+              OR dataset.payment_type_diversity_180d < 0
+              OR dataset.installment_order_share_180d < 0
+              OR dataset.installment_order_share_180d > 1
               OR dataset.avg_payment_installments_180d < 0
               OR dataset.credit_card_order_share_180d < 0
               OR dataset.credit_card_order_share_180d > 1
