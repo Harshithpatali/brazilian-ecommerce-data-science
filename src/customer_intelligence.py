@@ -54,26 +54,27 @@ def _explain_customer(row: pd.Series) -> str:
 
 
 def kaplan_meier(customers: pd.DataFrame) -> pd.DataFrame:
-    """KM estimate for time from first to second delivered purchase; single-order customers are censored at data end."""
-    required = {"orders", "first_order_date", "last_order_date"}
+    """KM estimate for first-to-second delivered purchase; customers without event are right-censored at data end."""
+    required = {"orders", "first_order_date", "second_order_date", "last_order_date"}
     missing = required.difference(customers.columns)
     if missing:
-        raise ValueError(f"Customer metrics missing columns: {sorted(missing)}")
+        raise ValueError(
+            f"Customer metrics missing {sorted(missing)}. Rebuild analytics.customer_metrics "
+            "to include the exact second delivered purchase date."
+        )
     d = customers.copy()
-    d["first_order_date"] = pd.to_datetime(d["first_order_date"], errors="coerce")
-    d["last_order_date"] = pd.to_datetime(d["last_order_date"], errors="coerce")
+    for col in ["first_order_date", "second_order_date", "last_order_date"]:
+        d[col] = pd.to_datetime(d[col], errors="coerce")
     d["orders"] = pd.to_numeric(d["orders"], errors="coerce").fillna(0)
     d = d.dropna(subset=["first_order_date", "last_order_date"])
     if d.empty:
         return pd.DataFrame(columns=["day", "at_risk", "events", "censored", "survival", "repeat_purchase_cumulative"])
     data_end = d["last_order_date"].max().normalize()
-    observed = d["orders"] >= 2
-    duration = np.where(
-        observed,
-        (d["last_order_date"] - d["first_order_date"]).dt.total_seconds() / 86400,
-        (data_end - d["first_order_date"]).dt.total_seconds() / 86400,
-    )
-    d["duration_days"] = np.maximum(np.floor(duration).astype(int), 0)
+    observed = d["second_order_date"].notna() & (d["orders"] >= 2)
+    event_duration = (d["second_order_date"] - d["first_order_date"]).dt.total_seconds() / 86400
+    censor_duration = (data_end - d["first_order_date"]).dt.total_seconds() / 86400
+    duration = np.where(observed, event_duration, censor_duration)
+    d["duration_days"] = np.maximum(np.floor(np.nan_to_num(duration, nan=0)).astype(int), 0)
     d["event"] = observed.astype(int)
     rows = []
     survival = 1.0
