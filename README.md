@@ -19,6 +19,24 @@
 
 </div>
 
+## Customer intelligence and decision science
+
+The platform is designed as a customer analytics product—not merely a churn classifier. It combines:
+- **Customer analytics:** customer-level purchase frequency, value, AOV, review and delivery indicators.
+- **Cohort retention:** acquisition cohorts and repeat activity by elapsed month.
+- **RFM segmentation:** transparent recency/frequency/monetary quintiles with a plain-language explanation for each customer.
+- **Purchase survival:** Kaplan–Meier time-to-second-delivered-purchase analysis. Customers without an observed second purchase are right-censored at the end of the observed dataset.
+- **Model research:** temporal, purged evaluation against frequency baselines. The current v6 model is explicitly research-only because it did not beat the lifetime-frequency baseline on the untouched holdout.
+- **Campaign decision simulator:** audience size, contact cost, assumed incremental lift, contribution margin, break-even lift and scenario net contribution. These are user-controlled assumptions, not causal estimates.
+
+**Live dashboard:** [Olist Customer Intelligence](https://olist-ecommerce-ds.streamlit.app/) · **Decision Lab:** sidebar → Decision Lab.
+
+> **Model integrity:** v6 final holdout PR-AUC is 0.01048 versus 0.01665 for the lifetime-frequency baseline; ROC-AUC is 0.5494. The model is not production eligible. We report this result rather than tune against the holdout or claim unsupported predictive performance.
+
+See [Architecture](docs/ARCHITECTURE.md), [Interview Guide](docs/INTERVIEW_GUIDE.md), and [Model Card](docs/MODEL_CARD.md).
+
+
+
 ---
 
 ## 📑 Table of Contents
