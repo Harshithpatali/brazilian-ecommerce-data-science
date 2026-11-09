@@ -18,8 +18,8 @@ second_purchase AS (
 SELECT
     m.customer_unique_id,
     COUNT(*) FILTER (WHERE m.order_status = 'delivered') AS orders,
-    MIN(m.order_purchase_timestamp)::date AS first_order_date,
-    MAX(m.order_purchase_timestamp)::date AS last_order_date,
+    MIN(m.order_purchase_timestamp) FILTER (WHERE m.order_status = 'delivered')::date AS first_order_date,
+    MAX(m.order_purchase_timestamp) FILTER (WHERE m.order_status = 'delivered')::date AS last_order_date,
     s.second_order_date,
     SUM(m.gross_order_value) FILTER (WHERE m.order_status = 'delivered') AS revenue,
     AVG(m.gross_order_value) FILTER (WHERE m.order_status = 'delivered') AS aov,
