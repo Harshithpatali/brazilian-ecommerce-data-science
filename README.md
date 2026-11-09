@@ -286,7 +286,7 @@ The dashboard reports PR-AUC and ROC-AUC alongside prevalence, per-class precisi
 
 ### Current v6 status
 
-The v6 feature schema, SQL feature generation, model promotion gate, feature-importance export, and contract tests have been updated. The final v6 metrics must come from a successful full database rebuild and training run; earlier v5 scores must not be presented as v6 results.
+**Latest v6 run (2026-11-06):** the full database rebuild, target/feature integrity checks, training, artifact fingerprint validation, and artifact commit completed successfully. The selected cross-validation model was Random Forest (CV PR-AUC 0.01196), but its untouched chronological test PR-AUC was **0.01048**, below the lifetime-frequency baseline (**0.01665**). It also failed precision at all campaign capacities: model vs. baseline was **1.21% vs. 1.69% at 5%**, **1.01% vs. 1.21% at 10%**, and **0.87% vs. 0.88% at 20%**. The artifact is therefore correctly marked **`research_only`** and is not production-eligible. This is a successful engineering/evaluation run, not a successful predictive-model promotion. See the [Model Card](docs/MODEL_CARD.md) for the full metrics and limitations.
 
 See [Interview Guide](docs/INTERVIEW_GUIDE.md), [Model Card](docs/MODEL_CARD.md), [Churn Methodology](docs/churn_methodology.md), and [ML Modeling](docs/ml_modeling.md) for the full technical walkthrough, validation policy, and limitations.
 
