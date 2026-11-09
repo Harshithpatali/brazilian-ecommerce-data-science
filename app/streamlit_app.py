@@ -16,10 +16,10 @@ if str(ROOT) not in sys.path:
 import streamlit as st
 
 from app.components.theme import inject_theme
-from app.pages import churn, customers, delivery, executive, products, retention, sellers, statistics
+from app.pages import churn, customers, decision_lab, delivery, executive, products, retention, sellers, statistics
 
 st.set_page_config(
-    page_title="Brazilian E-Commerce Intelligence",
+    page_title="Customer Intelligence & Decision Science",
     page_icon="🇧🇷",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -29,17 +29,17 @@ inject_theme()
 
 
 def home() -> None:
-    st.title("🇧🇷 Brazilian E-Commerce Intelligence")
+    st.title("🇧🇷 Customer Intelligence & Decision Science")
     st.caption(
-        "Supabase PostgreSQL → SQL analytical layer → dashboard datasets → Streamlit → ML"
+        "PostgreSQL · Point-in-time analytics · RFM · Survival analysis · Decision science"
     )
     st.write(
-        "Explore marketplace performance, customer behavior, retention, products, "
-        "sellers, delivery experience, statistical analysis, and predictive churn risk."
+        "Explore customer value, cohort retention, product and seller performance, delivery experience, "
+        "time-to-second-purchase, model diagnostics, and campaign economics."
     )
     st.info(
-        "The dashboard is downstream of the SQL analytical layer. "
-        "The ML section consumes the point-in-time churn dataset generated from SQL."
+        "The predictive model is a research candidate, not a production targeting system. "
+        "Use the Decision Lab for transparent customer-level RFM explanations, survival curves, and assumption-led campaign scenarios."
     )
 
 
@@ -48,6 +48,7 @@ pages = {
         st.Page(home, title="Home", url_path="streamlit_app", icon="🏠"),
         st.Page(executive.render, title="Executive Overview", url_path="executive", icon="📊"),
         st.Page(customers.render, title="Customer Intelligence", url_path="customers", icon="👥"),
+        st.Page(decision_lab.render, title="Decision Lab", url_path="decision-lab", icon="🧪"),
         st.Page(retention.render, title="Cohort & Retention", url_path="retention", icon="🔁"),
         st.Page(products.render, title="Product Analytics", url_path="products", icon="🛍️"),
         st.Page(sellers.render, title="Seller Analytics", url_path="sellers", icon="🏪"),
