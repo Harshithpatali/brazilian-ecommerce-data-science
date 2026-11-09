@@ -69,4 +69,4 @@ For a real deployment, monitor:
 
 ## Current validation status
 
-The v6 schema, code, and feature-contract tests have been updated. Do not interpret this document as proof that v6 has passed a full database rebuild or achieved improved holdout performance. Confirm the latest GitHub Actions run and generated metadata before presenting numerical results.
+**Latest v6 validation (2026-11-06):** full SQL rebuild, point-in-time/target integrity validation, model training, metadata/model fingerprint checks, and artifact publication completed successfully. The selected Random Forest achieved holdout PR-AUC **0.01048** (ROC-AUC **0.5494**) against lifetime-frequency PR-AUC **0.01665**. Precision at 5%, 10%, and 20% capacity was **1.21%, 1.01%, and 0.87%**, respectively, versus **1.69%, 1.21%, and 0.88%** for lifetime frequency. The promotion gate correctly rejected it: `pipeline_status=research_only`, `production_eligible=false`. The workflow and artifact pipeline are validated; predictive performance is not sufficient for production use.
