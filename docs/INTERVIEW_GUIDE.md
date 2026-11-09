@@ -61,7 +61,7 @@ Every feature must be based on purchases and deliveries observable before the sn
 
 The best CV candidate is not automatically deployable. The final test period is used once to assess generalization. Promotion requires the candidate to beat lifetime frequency on holdout PR-AUC and precision at each predefined monthly contact capacity. If it fails, the pipeline can publish research artifacts, but metadata marks it research_only and the dashboard warns against production targeting.
 
-Do not claim the model is production-ready or quote a v6 score until the v6 database rebuild, integrity checks, model run, and artifact contract have all completed successfully.
+**Latest v6 result (2026-11-06):** the database rebuild, integrity checks, training, model fingerprint validation, and artifact commit completed successfully. Random Forest was selected by temporal CV (PR-AUC 0.01196), but final holdout PR-AUC was 0.01048 versus 0.01665 for lifetime frequency. It also lost to that baseline at 5%, 10%, and 20% campaign capacity. Metadata correctly sets `pipeline_status=research_only`; the model must not be presented as production-ready. The key interview story is the evidence-based decision not to promote a model that failed its pre-registered baseline gate.
 
 ## Likely interview questions
 
