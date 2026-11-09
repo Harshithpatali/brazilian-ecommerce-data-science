@@ -112,3 +112,21 @@ Validate on a later external time period or live shadow deployment; add campaign
     streamlit run app/Home.py
 
 Check the current Streamlit entrypoint if the home file has been renamed. Database credentials must be configured in environment variables or GitHub Actions secrets; never commit credentials.
+
+
+## Customer intelligence extensions
+
+### RFM segmentation
+The dashboard derives recency from the analysis cutoff and last delivered purchase, frequency from delivered order count, and monetary value from customer revenue. Each dimension is assigned a relative quintile score. Segment labels are rule-based descriptions (for example, Champions or At Risk), not learned customer identities. Customer rows include a human-readable explanation of all three dimensions and a suggested interpretation.
+
+### Time-to-second-purchase survival analysis
+The Kaplan–Meier estimator models time from first to second delivered purchase. A customer with two or more delivered orders contributes an observed event at the interval between first and last delivered order. A one-order customer is right-censored at the latest date represented in the customer dataset. The survival curve estimates the probability of not yet observing a second purchase; one minus survival is the cumulative incidence estimate under non-informative censoring. Discuss censoring and the fact that this is historical observational data.
+
+### Campaign scenario planner
+The simulator allows an analyst to choose an audience, contact fraction, contact cost, assumed lift in percentage points, and contribution margin. It calculates contact volume, assumed incremental buyers, incremental revenue, gross contribution, campaign cost, net scenario contribution and break-even lift. The lift is an explicit input, not trained or identified from Olist. Olist has no randomized treatment/control assignment, so the simulator must never be described as causal uplift, measured ROI, or a validated forecast.
+
+### Why the predictive model is research-only
+The v6 Random Forest achieved holdout PR-AUC 0.01048 versus 0.01665 for lifetime-frequency ranking, with ROC-AUC 0.5494. It failed the promotion gate and is not deployed for production decisions. The correct next steps are feature ablation, leakage and cohort audits, stability analysis by time and customer tenure, and investigation of label sparsity/observation windows. Do not select features, thresholds, or models using the final test set. Keep the final holdout frozen until a new, pre-registered evaluation period is available.
+
+### Suggested interview narrative
+“I treated the predictive score as one component of a larger customer decision system. The model failed to outperform a simple lifetime-frequency baseline on the untouched holdout, so I did not ship it. I extended the product with descriptive RFM explanations, cohort analysis, survival analysis for purchase timing, and an assumption-led campaign economics simulator. This demonstrates that I can translate data into a business decision while communicating uncertainty and causal limitations.”
