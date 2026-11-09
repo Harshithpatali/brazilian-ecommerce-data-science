@@ -54,7 +54,7 @@ pages = {
         st.Page(sellers.render, title="Seller Analytics", url_path="sellers", icon="🏪"),
         st.Page(delivery.render, title="Delivery & Experience", url_path="delivery", icon="🚚"),
         st.Page(statistics.render, title="Statistical Analysis", url_path="statistics", icon="📈"),
-        st.Page(churn.render, title="Churn Intelligence", url_path="churn", icon="🎯"),
+        st.Page(churn.render, title="Predictive Model Research", url_path="churn", icon="🎯"),
     ]
 }
 
