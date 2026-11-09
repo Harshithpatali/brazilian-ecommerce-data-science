@@ -43,8 +43,14 @@ def render() -> None:
                            "customer_rfm_explanations.csv", "text/csv")
 
     with tabs[1]:
-        section_title("Time to second delivered purchase", "Kaplan–Meier estimate. Customers with only one observed delivered order are right-censored at the dataset end; the curve is not a causal effect.")
-        km = kaplan_meier(raw)
+        section_title("Time to second delivered purchase", "Kaplan–Meier estimate using the exact second delivered order date. Customers without a second purchase are right-censored at the latest observed order date; this is not a causal effect.")
+        try:
+            km = kaplan_meier(raw)
+        except ValueError as exc:
+            st.warning("The committed dashboard extract predates the exact second-purchase field.")
+            st.code("python -m scripts.build_all", language="bash")
+            st.caption(str(exc))
+            km = pd.DataFrame()
         if km.empty:
             st.info("Not enough dated customer records to estimate the curve.")
         else:
