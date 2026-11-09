@@ -33,7 +33,7 @@ The platform is designed as a customer analytics product—not merely a churn cl
 
 > **Model integrity:** v6 final holdout PR-AUC is 0.01048 versus 0.01665 for the lifetime-frequency baseline; ROC-AUC is 0.5494. The model is not production eligible. We report this result rather than tune against the holdout or claim unsupported predictive performance.
 
-See [Architecture](docs/ARCHITECTURE.md), [Interview Guide](docs/INTERVIEW_GUIDE.md), and [Model Card](docs/MODEL_CARD.md).
+See [Architecture](docs/ARCHITECTURE.md), [Interview Guide](docs/INTERVIEW_GUIDE.md), [Model Investigation](docs/MODEL_INVESTIGATION.md), and [Model Card](docs/MODEL_CARD.md).
 
 
 
