@@ -7,11 +7,14 @@ from pathlib import Path
 # this file directly, it adds this file's own directory ("app/") to
 # sys.path, not the repo root. That breaks "from app.components... import"
 # because Python looks for a package named "app" inside app/ itself.
-# Adding the repo root here makes the "app.*" imports work regardless of
-# how the script is invoked.
+# Ensure both the repository root (for app.* and src.* imports) and this
+# directory are importable when Streamlit Cloud launches a nested entrypoint.
 ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
+APP_DIR = Path(__file__).resolve().parent
+for import_path in (ROOT, APP_DIR):
+    resolved = str(import_path)
+    if resolved not in sys.path:
+        sys.path.insert(0, resolved)
 
 import streamlit as st
 
