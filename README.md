@@ -19,6 +19,10 @@
 
 </div>
 
+## Decision-maker brief
+
+[Second-purchase and retention decision brief](docs/DECISION_BRIEF.md) — translates the customer analytics into a CRM decision workflow and explains why the current propensity model remains research-only.
+
 ## Customer intelligence and decision science
 
 The platform is designed as a customer analytics product—not merely a churn classifier. It combines:
