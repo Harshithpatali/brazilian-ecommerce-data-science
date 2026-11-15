@@ -19,6 +19,10 @@
 
 </div>
 
+## Advanced customer science extensions
+
+The new [Advanced Customer Science methods guide](docs/ADVANCED_CUSTOMER_SCIENCE.md) and sidebar page add a first-order-only 180-day repeat target, optional BG/NBD + Gamma-Gamma fitting utilities, cross-fitted doubly robust observational estimation, experiment power/CUPED/bootstrap/sequential-look utilities, and BRL logistics economics. These are research tools; database-dependent models still require a fresh SQL build and evaluation. Olist contains no randomized campaign assignment, so no simulated or observational result is presented as measured uplift.
+
 ## Decision-maker brief
 
 [Second-purchase and retention decision brief](docs/DECISION_BRIEF.md) — translates the customer analytics into a CRM decision workflow and explains why the current propensity model remains research-only.
