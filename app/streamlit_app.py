@@ -19,7 +19,7 @@ for import_path in (ROOT, APP_DIR):
 import streamlit as st
 
 from app.components.theme import inject_theme
-from app.pages import churn, customers, decision_lab, delivery, executive, products, retention, sellers, statistics
+from app.pages import advanced_decision_science, churn, customers, decision_lab, delivery, executive, products, retention, sellers, statistics
 
 st.set_page_config(
     page_title="Customer Intelligence & Decision Science",
@@ -52,6 +52,7 @@ pages = {
         st.Page(executive.render, title="Executive Overview", url_path="executive", icon="📊"),
         st.Page(customers.render, title="Customer Intelligence", url_path="customers", icon="👥"),
         st.Page(decision_lab.render, title="Decision Lab", url_path="decision-lab", icon="🧪"),
+        st.Page(advanced_decision_science.render, title="Advanced Decision Science", url_path="advanced-decision-science", icon="🧠"),
         st.Page(retention.render, title="Cohort & Retention", url_path="retention", icon="🔁"),
         st.Page(products.render, title="Product Analytics", url_path="products", icon="🛍️"),
         st.Page(sellers.render, title="Seller Analytics", url_path="sellers", icon="🏪"),
