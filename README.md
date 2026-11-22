@@ -545,3 +545,21 @@ This project is released under the [MIT License](LICENSE). The underlying Olist 
 GitHub: [@Harshithpatali](https://github.com/Harshithpatali)
 
 If you find this project useful or have suggestions, feel free to open an issue or a pull request.
+
+ 
+## Evaluation status and next experiment
+
+**Current status: research-only.** The frozen v6 second-purchase model reported holdout PR-AUC 0.01048 versus 0.01665 for the lifetime-frequency baseline. It did not pass the predefined campaign-capacity promotion gate. Do not describe this model as production-ready or claim that it beats the baseline.
+
+A training-only, purged temporal feature-ablation runner is available:
+
+```bash
+python scripts/run_repeat_purchase_ablation.py
+pytest -q tests/test_temporal_splits.py tests/test_repeat_purchase_ablation.py
+```
+
+The ablation compares feature families with a lifetime-frequency control using training-period temporal CV only. It does not use validation or final-test labels and cannot establish a holdout win. Any candidate selected after this research requires a later, previously untouched temporal evaluation period.
+
+## Model card and business interpretation
+
+See [Model Card](docs/MODEL_CARD.md) and [Next Model Experiments](docs/NEXT_MODEL_EXPERIMENTS.md). The business question is which first-time delivered customers to prioritize for a second-purchase retention contact within 90 days, subject to a fixed monthly contact capacity. Predictive ranking is not proof of incremental campaign impact; Olist has no randomized CRM treatment assignment.

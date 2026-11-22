@@ -268,12 +268,13 @@ def choose_fbeta_threshold(
     }
 
 
-def _optional_boosted_models() -> dict[str, tuple[Any, dict[str, list[Any]]]]:
+def _optional_boosted_models(feature_cols: list[str] | None = None) -> dict[str, tuple[Any, dict[str, list[Any]]]]:
     """Add optional tree boosters when installed; keep the core pipeline portable."""
+    columns = list(feature_cols or FEATURE_COLS)
     numeric = Pipeline([
         ("imputer", SimpleImputer(strategy="median", add_indicator=True)),
     ])
-    preprocess = ColumnTransformer([("numeric", numeric, FEATURE_COLS)])
+    preprocess = ColumnTransformer([("numeric", numeric, columns)])
     candidates: dict[str, tuple[Any, dict[str, list[Any]]]] = {}
     try:
         from xgboost import XGBClassifier
@@ -326,13 +327,15 @@ def _optional_boosted_models() -> dict[str, tuple[Any, dict[str, list[Any]]]]:
     return candidates
 
 
-def build_models() -> dict[str, tuple[Any, dict[str, list[Any]]]]:
+def build_models(feature_cols: list[str] | None = None) -> dict[str, tuple[Any, dict[str, list[Any]]]]:
+    """Build comparable candidate pipelines over an explicit feature contract."""
+    columns = list(feature_cols or FEATURE_COLS)
     numeric = Pipeline([
         ("imputer", SimpleImputer(strategy="median", add_indicator=True)),
         ("scaler", StandardScaler()),
     ])
-    preprocess = ColumnTransformer([("numeric", numeric, FEATURE_COLS)])
-    return {
+    preprocess = ColumnTransformer([("numeric", numeric, columns)])
+    candidates = {
         "logistic_regression": (
             Pipeline([
                 ("preprocess", preprocess),
@@ -387,27 +390,19 @@ def build_models() -> dict[str, tuple[Any, dict[str, list[Any]]]]:
                 "model__max_features": ["sqrt"],
             },
         ),
-        "baseline_recency_only": (
-            UnivariateRepeatPurchaseBaseline(
-                "recency_days", direction="lower", transform="log1p"
-            ),
-            {},
-        ),
-        "baseline_recent_frequency_only": (
-            UnivariateRepeatPurchaseBaseline(
-                "orders_180d", direction="higher", transform="log1p"
-            ),
-            {},
-        ),
-        "baseline_lifetime_frequency_only": (
-            UnivariateRepeatPurchaseBaseline(
-                "lifetime_delivered_orders",
-                direction="higher",
-                transform="log1p",
-            ),
-            {},
-        ),
-    } | _optional_boosted_models()
+    }
+    baseline_specs = {
+        "baseline_recency_only": ("recency_days", "lower"),
+        "baseline_recent_frequency_only": ("orders_180d", "higher"),
+        "baseline_lifetime_frequency_only": ("lifetime_delivered_orders", "higher"),
+    }
+    for name, (feature, direction) in baseline_specs.items():
+        if feature in columns:
+            candidates[name] = (
+                UnivariateRepeatPurchaseBaseline(feature, direction=direction, transform="log1p"),
+                {},
+            )
+    return candidates | _optional_boosted_models(columns)
 
 
 def _require_both_classes(y: pd.Series, name: str) -> None:
