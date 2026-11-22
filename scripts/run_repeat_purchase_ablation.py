@@ -79,14 +79,14 @@ def run(model_names: list[str]) -> pd.DataFrame:
         dates, y=y, n_splits=min(4, dates.dt.normalize().nunique() - 5),
         min_train_repeat_events=10, min_validation_repeat_events=5,
     )
-    available_models = build_models()
     rows: list[dict[str, object]] = []
     for group_name, columns in feature_groups().items():
         X = train[columns].copy()
+        group_models = build_models(columns)
         candidates = {
-            name: available_models[name]
+            name: group_models[name]
             for name in model_names + ["baseline_lifetime_frequency_only"]
-            if name in available_models
+            if name in group_models
         }
         for model_name, (estimator, grid) in candidates.items():
             search = GridSearchCV(
