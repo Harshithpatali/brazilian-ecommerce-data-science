@@ -1,0 +1,43 @@
+name: Second-purchase temporal feature ablation
+
+on:
+  workflow_dispatch:
+    inputs:
+      model_family:
+        description: Candidate model family for the training-only ablation
+        required: true
+        type: choice
+        default: logistic_regression
+        options:
+          - logistic_regression
+          - hist_gradient_boosting
+          - xgboost
+
+permissions:
+  contents: read
+
+jobs:
+  ablation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install project dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Run focused tests
+        run: pytest -q tests/test_temporal_splits.py tests/test_repeat_purchase_ablation.py
+      - name: Run training-only feature ablation
+        run: python scripts/run_repeat_purchase_ablation.py --models "${{ inputs.model_family }}"
+      - name: Upload temporal CV report
+        uses: actions/upload-artifact@v4
+        with:
+          name: repeat-purchase-temporal-ablation
+          path: reports/model_research/repeat_purchase_ablation_cv.csv
+          if-no-files-found: error
+          retention-days: 30
