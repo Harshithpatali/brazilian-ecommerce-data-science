@@ -21,7 +21,7 @@ python scripts/run_repeat_purchase_ablation.py --models logistic_regression hist
 pytest -q tests/test_temporal_splits.py tests/test_repeat_purchase_ablation.py
 ```
 
-The script requires the rebuilt `data/ml/customer_churn_dataset.parquet` produced by the existing SQL pipeline. It does not download or replace source data.
+The script requires the rebuilt `data/ml/customer_churn_dataset.parquet` produced by the existing SQL pipeline. It does not download or replace source data. It can also be launched from **GitHub Actions → Second-purchase temporal feature ablation** using the manual workflow; select one candidate family and download the `repeat-purchase-temporal-ablation` artifact.
 
 ## Feature hypotheses
 
