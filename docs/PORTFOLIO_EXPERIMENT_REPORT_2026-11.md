@@ -45,3 +45,7 @@ Record the following with every run:
 - Holdout decision and whether the artifact is research-only or eligible.
 
 **Interpretation:** the present result demonstrates temporal evaluation discipline and a meaningful baseline failure diagnosis. It does not demonstrate that the current machine-learning model improves campaign targeting.
+
+## Data rebuild status
+
+The latest available automated v6 rebuild attempt (22 November 2026) passed unit/regression tests but stopped at the read-only Supabase schema preflight. The database connection returned a Supabase tenant/user-not-found error; downstream source profiling, SQL rebuild, model training and artifact publication were skipped. This is an external database-connection/configuration blocker, not a model-training result. Until the database connection is repaired and a fresh source snapshot is rebuilt, no new feature-ablation metric or model promotion claim is available.
