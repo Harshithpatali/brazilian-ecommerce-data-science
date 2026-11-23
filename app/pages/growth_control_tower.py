@@ -64,7 +64,9 @@ def render():
     with pc2: metric_card("Illustrative price",f"R$ {pricing['recommended_price']:.2f}",help_text="Constrained search above unit cost",accent="blue")
     with pc3: metric_card("Demand index",f"{pricing['relative_demand_index']:.2f}×",help_text="Relative to reference price",accent="amber")
     st.caption("Pricing is demonstrated on synthetic price/quantity observations. Historical Olist price associations are not automatically causal; validate with randomized or quasi-experimental price variation.")
-    policy=recommend_action(float(top20["uplift"]),72,float(high.anomaly_score.max() if len(high) else 0),100,.5,1.0)
+    high_risk = risk.loc[risk.risk_level.eq("High")]
+    max_anomaly = float(high_risk.anomaly_score.max()) if not high_risk.empty else 0.0
+    policy = recommend_action(float(top20["uplift"]), 72, max_anomaly, 100, .5, 1.0)
     with st.expander("Unified decision policy · example triage"):
         st.write(policy)
         st.caption("Illustrative rules-based policy only. Production use requires calibrated scores, business cost inputs and offline/online validation.")
@@ -74,7 +76,6 @@ def render():
     with st.expander("Model details and downloadable review queue"):
         st.markdown("**Uplift:** T-learner trained and evaluated on a randomized synthetic campaign benchmark. Not measured Olist campaign lift.")
         st.write({"Benchmark rows":len(exp),"Holdout rows":len(uplift["scored"]),"Randomized ITT":uplift["observed_itt"],"Model estimated ATE":uplift["ate_model_estimate"],"Top-20% uplift":top20["uplift"]})
-        st.markdown("**Fraud:** Isolation Forest anomaly ranking only. It does not produce confirmed fraud labels or calibrated fraud probabilities.")
         st.markdown("**Fraud:** Isolation Forest anomaly ranking only. It does not produce confirmed fraud labels or calibrated fraud probabilities.")
         allocation_input=uplift["scored"].copy()
         allocation_input["customer_id"]=[f"SIM{i:05d}" for i in range(len(allocation_input))]
