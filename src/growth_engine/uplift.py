@@ -14,7 +14,7 @@ def fit_t_learner(data: pd.DataFrame, random_state: int=42) -> dict:
     for arm in (0,1):
         arm_data=train.loc[train.treatment==arm]
         if arm_data.outcome.nunique()<2: raise ValueError("Each arm must contain both outcome classes")
-        model=RandomForestClassifier(n_estimators=180,min_samples_leaf=15,max_features=.9,class_weight="balanced_subsample",n_jobs=-1,random_state=random_state+arm)
+        model=RandomForestClassifier(n_estimators=180,min_samples_leaf=15,max_features=.9,n_jobs=-1,random_state=random_state+arm)
         model.fit(arm_data[FEATURES],arm_data.outcome); models[arm]=model
     scored=test.copy(); scored["p_control"]=models[0].predict_proba(test[FEATURES])[:,1]; scored["p_treatment"]=models[1].predict_proba(test[FEATURES])[:,1]; scored["uplift"]=scored.p_treatment-scored.p_control
     itt=float(test.loc[test.treatment==1,"outcome"].mean()-test.loc[test.treatment==0,"outcome"].mean())
