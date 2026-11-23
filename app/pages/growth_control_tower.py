@@ -9,6 +9,8 @@ from src.growth_engine.experiments import make_randomized_campaign_data
 from src.growth_engine.uplift import fit_t_learner,uplift_at_k,uplift_curve
 from src.growth_engine.pricing import fit_demand_elasticity,optimize_price
 from src.growth_engine.decision_policy import recommend_action
+from src.growth_engine.campaign_optimizer import allocate_campaign_budget
+from src.growth_engine.monitoring import population_stability_index,drift_status
 from src.growth_engine.fraud import make_demo_transactions,score_transactions
 
 BLUE="#3b82f6"; ORANGE="#f97316"; PURPLE="#9333ea"; PANEL="#171333"
@@ -73,4 +75,12 @@ def render():
         st.markdown("**Uplift:** T-learner trained and evaluated on a randomized synthetic campaign benchmark. Not measured Olist campaign lift.")
         st.write({"Benchmark rows":len(exp),"Holdout rows":len(uplift["scored"]),"Randomized ITT":uplift["observed_itt"],"Model estimated ATE":uplift["ate_model_estimate"],"Top-20% uplift":top20["uplift"]})
         st.markdown("**Fraud:** Isolation Forest anomaly ranking only. It does not produce confirmed fraud labels or calibrated fraud probabilities.")
+        st.markdown("**Fraud:** Isolation Forest anomaly ranking only. It does not produce confirmed fraud labels or calibrated fraud probabilities.")
+        allocation_input=uplift["scored"].copy()
+        allocation_input["customer_id"]=[f"SIM{i:05d}" for i in range(len(allocation_input))]
+        allocation=allocate_campaign_budget(allocation_input,budget=250,contact_cost=.5,contribution_per_conversion=120,discount_cost=1.0)
+        st.write({"Budget":allocation["budget"],"Selected customers":allocation["customers_selected"],"Spend":allocation["spend"],"Expected net value (simulation)":allocation["expected_net_value"]})
+        psi=population_stability_index(exp["customer_value"],exp["customer_value"].sample(frac=1,random_state=2))
+        st.write({"Synthetic feature drift PSI":round(psi,4),"Drift status":drift_status(psi)})
+        st.caption("Budget allocation and PSI are demonstration diagnostics. Use a time-separated reference/current population and validated uplift before operational use.")
         st.download_button("Download synthetic risk review queue",risk.to_csv(index=False).encode("utf-8"),"synthetic_risk_review_queue.csv","text/csv")
