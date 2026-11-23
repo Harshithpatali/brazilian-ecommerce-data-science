@@ -34,8 +34,8 @@
     "method": "Platt sigmoid",
     "fit_source": "purged out-of-fold predictions from training partition only",
     "training_oof_rows": 54525,
-    "slope": 0.22130936763340942,
-    "intercept": -4.534791093913119
+    "slope": 0.22130936763340958,
+    "intercept": -4.534791093913118
   },
   "threshold_objective": "F2",
   "threshold_beta": 2.0,
@@ -182,12 +182,12 @@
     "positive_prevalence": 0.006158873805932629,
     "threshold": 0.9895158968760775,
     "brier_score": 0.006134003498192755,
-    "log_loss": 0.03826568708886363,
-    "expected_calibration_error": 0.0037889687097918774,
+    "log_loss": 0.03826568708886364,
+    "expected_calibration_error": 0.0037889687097918865,
     "prior_dummy_brier_score": 0.006126062211326088,
     "prior_dummy_log_loss": 0.03782585269030034,
-    "mean_predicted_repeat_probability": 0.009947842515724507,
-    "predicted_to_observed_rate_ratio": 1.6152047970429424,
+    "mean_predicted_repeat_probability": 0.009947842515724515,
+    "predicted_to_observed_rate_ratio": 1.6152047970429437,
     "dummy_baseline_pr_auc": 0.006158873805932629,
     "recency_baseline_pr_auc": 0.00792794178145024,
     "frequency_baseline_pr_auc": 0.008910984292957296,
@@ -370,7 +370,7 @@
     "test_pr_auc": 0.006158873805932629,
     "test_positive_prevalence": 0.006158873805932629
   },
-  "model_sha256": "4e6e655fc9eb6b3b250848bda02d4ac118d0be47417a9937a36a372364a5c81b",
+  "model_sha256": "dbd2f67e7f0d7f240977c406fa3e478225edd7d8cba4e936819bc1b4e72de82d",
   "artifacts": {
     "model": "models/best_churn_model.joblib",
     "comparison": "models/model_comparison.csv",
