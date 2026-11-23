@@ -20,3 +20,6 @@ Run pytest -q. Demo data uses fixed seeds. The page appears as Growth & Risk Con
 
 ## Deployment
 Existing Streamlit deployment and entrypoint are retained. No paid service or database migration is required for this demo extension.
+
+## Campaign budget allocation and drift monitoring
+The campaign optimizer ranks customers by estimated incremental contribution after contact and discount costs, then selects positive-value customers under a fixed budget. This is a model-based scenario, not measured profit. The monitoring utility calculates population stability index (PSI) for numeric features; compare a frozen reference period with a later production period, not shuffled rows from the same sample. Suggested interpretation bands are <0.10 stable, 0.10–0.25 monitor, and ≥0.25 investigate; thresholds are heuristics and should be calibrated to the feature and business process.
