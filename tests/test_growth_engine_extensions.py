@@ -8,7 +8,7 @@ def test_campaign_budget_respected_and_negative_value_excluded():
     data=pd.DataFrame({"customer_id":["a","b","c"],"uplift":[.3,.2,-.1]})
     result=allocate_campaign_budget(data,10,2,100,1)
     assert result["spend"]<=10
-    assert result["customers_selected"]==3
+    assert result["customers_selected"]==2
     assert result["expected_net_value"]>0
 
 def test_psi_detects_distribution_shift():
