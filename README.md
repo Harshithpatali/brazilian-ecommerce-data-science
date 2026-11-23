@@ -563,3 +563,8 @@ The ablation compares feature families with a lifetime-frequency control using t
 ## Model card and business interpretation
 
 See [Model Card](docs/MODEL_CARD.md) and [Next Model Experiments](docs/NEXT_MODEL_EXPERIMENTS.md). The business question is which first-time delivered customers to prioritize for a second-purchase retention contact within 90 days, subject to a fixed monthly contact capacity. Predictive ranking is not proof of incremental campaign impact; Olist has no randomized CRM treatment assignment.
+
+
+## Reproducible experiment record
+
+See [Portfolio Experiment Report](docs/PORTFOLIO_EXPERIMENT_REPORT_2026-11.md) for the frozen v6 baseline comparison, holdout guardrails and the protocol for evaluating any future candidate on a genuinely new temporal holdout. The current model remains research-only; do not quote it as beating the lifetime-frequency baseline.
