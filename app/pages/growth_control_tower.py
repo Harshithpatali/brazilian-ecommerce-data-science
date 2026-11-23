@@ -28,7 +28,7 @@ def render():
     st.markdown("<div class='control-tower-kicker'>COMMERCE OPERATIONS · GROWTH · RISK</div>",unsafe_allow_html=True)
     hero("E-commerce Growth & Risk Control Tower","A unified view of customer growth, returns, payments and transaction risk.")
     st.caption("DEMO MODE · Operational return/payment events and fraud signals are synthetic examples. Campaign uplift is evaluated on a randomized simulation, not Olist campaign history.")
-    risk,exp,uplift=demo_assets(); top20=uplift_at_k(uplift["scored"],.2)
+    risk_data,exp,uplift=demo_assets(); top20=uplift_at_k(uplift["scored"],.2)
     rng=np.random.default_rng(24); days=np.arange(1,31); trend=pd.DataFrame({"Day":days,"Orders":np.maximum(25,52+12*np.sin(days/2.4)+rng.normal(0,6,30)).round().astype(int)})
     cols=st.columns(5)
     for col,(label,value,accent) in zip(cols,[("Total payments","4,753","blue"),("COD orders","904","violet"),("Online orders","936","teal"),("Payment failures","157","rose"),("Refunds processed","624","amber")]):
@@ -43,15 +43,15 @@ def render():
     left,right=st.columns([1.35,1])
     with left:
         section_title("High-risk customers · potential anomalies")
-        table=risk.loc[risk.risk_level.eq("High"),["customer_id","order_value","return_count","refund_ratio","anomaly_score","risk_level"]].head(12).copy()
+        table=risk_data.loc[risk_data["risk_level"].eq("High"),["customer_id","order_value","return_count","refund_ratio","anomaly_score","risk_level"]].head(12).copy()
         table.columns=["Customer ID","Order value","Returns","Refund ratio","Risk score","Risk level"]
         st.dataframe(table.style.format({"Order value":"R$ {:,.2f}","Refund ratio":"{:.1%}","Risk score":"{:.0f}"}),use_container_width=True,hide_index=True,height=260)
     with right:
-        section_title("Fraud score distribution"); counts=risk.risk_level.value_counts().reindex(["High","Medium","Low"]).fillna(0).astype(int)
-        fig=go.Figure(go.Pie(labels=counts.index,values=counts.values,hole=.6,marker=dict(colors=[ORANGE,"#a855f7",BLUE]))); fig.update_layout(annotations=[dict(text=f"{len(risk):,}<br>Customers",x=.5,y=.5,showarrow=False,font_size=14)]); chart(fig,260)
+        section_title("Fraud score distribution"); counts=risk_data["risk_level"].value_counts().reindex(["High","Medium","Low"]).fillna(0).astype(int)
+        fig=go.Figure(go.Pie(labels=counts.index,values=counts.values,hole=.6,marker=dict(colors=[ORANGE,"#a855f7",BLUE]))); fig.update_layout(annotations=[dict(text=f"{len(risk_data):,}<br>Customers",x=.5,y=.5,showarrow=False,font_size=14)]); chart(fig,260)
     left,right=st.columns(2)
     with left:
-        section_title("Fraud score trend"); daily=risk.groupby("event_day").anomaly_score.mean().reset_index(name="Average risk score"); fig=px.line(daily,x="event_day",y="Average risk score",markers=True); fig.update_traces(line_color=BLUE,line_width=2); chart(fig,230)
+        section_title("Fraud score trend"); daily=risk_data.groupby("event_day").anomaly_score.mean().reset_index(name="Average risk score"); fig=px.line(daily,x="event_day",y="Average risk score",markers=True); fig.update_traces(line_color=BLUE,line_width=2); chart(fig,230)
     with right:
         section_title("Growth campaign · uplift benchmark")
         curve=uplift_curve(uplift["scored"]); curve=curve.iloc[::max(1,len(curve)//80)]
@@ -64,7 +64,7 @@ def render():
     with pc2: metric_card("Illustrative price",f"R$ {pricing['recommended_price']:.2f}",help_text="Constrained search above unit cost",accent="blue")
     with pc3: metric_card("Demand index",f"{pricing['relative_demand_index']:.2f}×",help_text="Relative to reference price",accent="amber")
     st.caption("Pricing is demonstrated on synthetic price/quantity observations. Historical Olist price associations are not automatically causal; validate with randomized or quasi-experimental price variation.")
-    high_risk = risk.loc[risk.risk_level.eq("High")]
+    high_risk = risk_data.loc[risk_data["risk_level"].eq("High")]
     max_anomaly = float(high_risk.anomaly_score.max()) if not high_risk.empty else 0.0
     policy = recommend_action(float(top20["uplift"]), 72, max_anomaly, 100, .5, 1.0)
     with st.expander("Unified decision policy · example triage"):
@@ -84,4 +84,4 @@ def render():
         psi=population_stability_index(exp["customer_value"],exp["customer_value"].sample(frac=1,random_state=2))
         st.write({"Synthetic feature drift PSI":round(psi,4),"Drift status":drift_status(psi)})
         st.caption("Budget allocation and PSI are demonstration diagnostics. Use a time-separated reference/current population and validated uplift before operational use.")
-        st.download_button("Download synthetic risk review queue",risk.to_csv(index=False).encode("utf-8"),"synthetic_risk_review_queue.csv","text/csv")
+        st.download_button("Download synthetic risk review queue",risk_data.to_csv(index=False).encode("utf-8"),"synthetic_risk_review_queue.csv","text/csv")
