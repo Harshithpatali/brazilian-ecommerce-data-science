@@ -19,10 +19,10 @@ for import_path in (ROOT, APP_DIR):
 import streamlit as st
 
 from app.components.theme import inject_theme
-from app.pages import advanced_decision_science, churn, customers, decision_lab, delivery, executive, products, retention, sellers, statistics
+from app.pages import advanced_decision_science, churn, customers, decision_lab, delivery, executive, products, retention, sellers, statistics, growth_control_tower
 
 st.set_page_config(
-    page_title="Customer Intelligence & Decision Science",
+    page_title="E-commerce Growth & Risk Control Tower",
     page_icon="🇧🇷",
     layout="wide",
     initial_sidebar_state="expanded",
