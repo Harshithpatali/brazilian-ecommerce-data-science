@@ -32,18 +32,8 @@ inject_theme()
 
 
 def home() -> None:
-    st.title("🇧🇷 Customer Intelligence & Decision Science")
-    st.caption(
-        "PostgreSQL · Point-in-time analytics · RFM · Survival analysis · Decision science"
-    )
-    st.write(
-        "Explore customer value, cohort retention, product and seller performance, delivery experience, "
-        "time-to-second-purchase, model diagnostics, and campaign economics."
-    )
-    st.info(
-        "The predictive model is a research candidate, not a production targeting system. "
-        "Use the Decision Lab for transparent customer-level RFM explanations, survival curves, and assumption-led campaign scenarios."
-    )
+    # Make the Control Tower the actual landing page, not a secondary page.
+    growth_control_tower.render()
 
 
 pages = {
