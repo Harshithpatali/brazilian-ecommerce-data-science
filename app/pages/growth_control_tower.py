@@ -6,7 +6,9 @@ import plotly.graph_objects as go
 import streamlit as st
 from app.components.ui import hero,metric_card,section_title
 from src.growth_engine.experiments import make_randomized_campaign_data
-from src.growth_engine.uplift import fit_t_learner,uplift_at_k
+from src.growth_engine.uplift import fit_t_learner,uplift_at_k,uplift_curve
+from src.growth_engine.pricing import fit_demand_elasticity,optimize_price
+from src.growth_engine.decision_policy import recommend_action
 from src.growth_engine.fraud import make_demo_transactions,score_transactions
 
 BLUE="#3b82f6"; ORANGE="#f97316"; PURPLE="#9333ea"; PANEL="#171333"
@@ -45,8 +47,20 @@ def render():
         section_title("Fraud score trend"); daily=risk.groupby("event_day").anomaly_score.mean().reset_index(name="Average risk score"); fig=px.line(daily,x="event_day",y="Average risk score",markers=True); fig.update_traces(line_color=BLUE,line_width=2); chart(fig,230)
     with right:
         section_title("Growth campaign · uplift benchmark")
-        summary=pd.DataFrame({"Metric":["Randomized experiment ITT","T-learner estimated ATE","Top-20% estimated uplift"],"Value":[uplift["observed_itt"],uplift["ate_model_estimate"],top20["uplift"]]})
-        fig=px.bar(summary,x="Metric",y="Value",color="Metric",color_discrete_sequence=[BLUE,PURPLE,ORANGE]); fig.update_layout(showlegend=False,yaxis_tickformat=".1%"); chart(fig,230)
+        curve=uplift_curve(uplift["scored"]); curve=curve.iloc[::max(1,len(curve)//80)]
+        fig=px.line(curve,x="fraction_targeted",y="incremental_rate"); fig.update_traces(line_color=PURPLE,line_width=2); fig.update_layout(xaxis_tickformat=".0%",yaxis_tickformat=".1%",xaxis_title="Audience ranked by estimated uplift",yaxis_title="Observed incremental response"); chart(fig,230)
+    section_title("Dynamic pricing · illustrative demand response")
+    rng_price=np.random.default_rng(19); prices=rng_price.uniform(65,145,500); units=1250*(prices/100)**-1.35*np.exp(rng_price.normal(0,.18,500))
+    elasticity=fit_demand_elasticity(pd.DataFrame({"price":prices,"units_sold":units})); pricing=optimize_price(elasticity["elasticity"],100,52,55,145)
+    pc1,pc2,pc3=st.columns(3)
+    with pc1: metric_card("Estimated elasticity",f"{elasticity['elasticity']:.2f}",help_text="Synthetic data · descriptive fit",accent="violet")
+    with pc2: metric_card("Illustrative price",f"R$ {pricing['recommended_price']:.2f}",help_text="Constrained search above unit cost",accent="blue")
+    with pc3: metric_card("Demand index",f"{pricing['relative_demand_index']:.2f}×",help_text="Relative to reference price",accent="amber")
+    st.caption("Pricing is demonstrated on synthetic price/quantity observations. Historical Olist price associations are not automatically causal; validate with randomized or quasi-experimental price variation.")
+    policy=recommend_action(float(top20["uplift"]),72,float(high.anomaly_score.max() if len(high) else 0),100,.5,1.0)
+    with st.expander("Unified decision policy · example triage"):
+        st.write(policy)
+        st.caption("Illustrative rules-based policy only. Production use requires calibrated scores, business cost inputs and offline/online validation.")
     section_title("Recent alerts")
     for col,(title,body,kind) in zip(st.columns(5),[("High return rate detected","Synthetic customer with elevated returns","warning"),("Multiple returns for same product","Review repeat-return pattern","warning"),("High refund amount","Refund exceeds review threshold","danger"),("COD order pattern suspicious","Review payment behavior","warning"),("Potential fraud detected","Anomaly score ≥ 80 · manual review","danger")]):
         with col: st.markdown(f"<div class='alert-tile {kind}'><b>{title}</b><span>{body}</span></div>",unsafe_allow_html=True)
