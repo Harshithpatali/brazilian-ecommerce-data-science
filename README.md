@@ -19,6 +19,12 @@
 
 </div>
 
+## Growth & Risk Control Tower
+
+The **Growth & Risk Control Tower** adds a screenshot-inspired dark operations dashboard with payment/return/cancellation monitoring, anomaly review queues, campaign uplift diagnostics, dynamic pricing scenarios and a transparent intervention policy. Open **Operations → Growth & Risk Control Tower** in the Streamlit sidebar. See [the implementation and validation notes](docs/GROWTH_RISK_CONTROL_TOWER.md).
+
+**Integrity note:** campaign, pricing and fraud demo data are synthetic. Olist has no randomized campaign assignments or verified fraud labels, and historical price associations are not automatically causal. The UI clearly labels these outputs as demonstrations rather than measured business impact or confirmed fraud.
+
 ## Advanced customer science extensions
 
 The new [Advanced Customer Science methods guide](docs/ADVANCED_CUSTOMER_SCIENCE.md) and sidebar page add a first-order-only 180-day repeat target, optional BG/NBD + Gamma-Gamma fitting utilities, cross-fitted doubly robust observational estimation, experiment power/CUPED/bootstrap/sequential-look utilities, and BRL logistics economics. These are research tools; database-dependent models still require a fresh SQL build and evaluation. Olist contains no randomized campaign assignment, so no simulated or observational result is presented as measured uplift.
