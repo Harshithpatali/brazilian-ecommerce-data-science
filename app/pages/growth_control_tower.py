@@ -13,6 +13,11 @@ from src.growth_engine.fraud import make_demo_transactions,score_transactions
 
 BLUE="#3b82f6"; ORANGE="#f97316"; PURPLE="#9333ea"; PANEL="#171333"
 
+@st.cache_data(show_spinner="Preparing synthetic demo data and models…")
+def demo_assets():
+    raw=make_demo_transactions(); risk=score_transactions(raw); exp=make_randomized_campaign_data(6000); uplift=fit_t_learner(exp)
+    return risk,exp,uplift
+
 def chart(fig,height=250):
     fig.update_layout(template="plotly_dark",paper_bgcolor="rgba(0,0,0,0)",plot_bgcolor=PANEL,font=dict(color="#e7e4f5",size=10),margin=dict(l=8,r=8,t=30,b=8),height=height,legend=dict(orientation="h",y=1.08,x=0))
     st.plotly_chart(fig,use_container_width=True,config={"displayModeBar":False})
@@ -21,7 +26,7 @@ def render():
     st.markdown("<div class='control-tower-kicker'>COMMERCE OPERATIONS · GROWTH · RISK</div>",unsafe_allow_html=True)
     hero("E-commerce Growth & Risk Control Tower","A unified view of customer growth, returns, payments and transaction risk.")
     st.caption("DEMO MODE · Operational return/payment events and fraud signals are synthetic examples. Campaign uplift is evaluated on a randomized simulation, not Olist campaign history.")
-    raw=make_demo_transactions(); risk=score_transactions(raw); exp=make_randomized_campaign_data(6000); uplift=fit_t_learner(exp); top20=uplift_at_k(uplift["scored"],.2)
+    risk,exp,uplift=demo_assets(); top20=uplift_at_k(uplift["scored"],.2)
     rng=np.random.default_rng(24); days=np.arange(1,31); trend=pd.DataFrame({"Day":days,"Orders":np.maximum(25,52+12*np.sin(days/2.4)+rng.normal(0,6,30)).round().astype(int)})
     cols=st.columns(5)
     for col,(label,value,accent) in zip(cols,[("Total payments","4,753","blue"),("COD orders","904","violet"),("Online orders","936","teal"),("Payment failures","157","rose"),("Refunds processed","624","amber")]):
